@@ -1,0 +1,21 @@
+[
+    {
+        "key": "googleCloudKeyJson",
+        "name": "JSON file with your google cloud key",
+        "type": "attachment",
+        "required": true
+    },
+    {
+        "key": "datasetId",
+        "name": "Dataset ID",
+        "type": "string",
+        "required": true
+    },
+    {
+        "key": "tableId",
+        "hint": "A table will be created if it does not exist.",
+        "name": "Table ID",
+        "type": "string",
+        "required": true
+    }
+]
