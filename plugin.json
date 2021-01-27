@@ -1,5 +1,5 @@
 {
-    "name": "bigquery-plugin",
+    "name": "BigQuery Export",
     "url": "https://github.com/PostHog/bigquery-plugin",
     "description": "Sends events to a BigQuery database on ingestion.",
     "main": "index.js",
