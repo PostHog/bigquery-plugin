@@ -57,16 +57,17 @@ async function processEventBatch(batch, { config, global }) {
 
     const rows = batch.map((oneEvent) => {
         const { event, properties, $set, ip, site_url, now, sent_at, ...misc } = oneEvent
-        const timestamp = oneEvent.timestamp || oneEvent.data?.timestamp
+        const timestamp = oneEvent.timestamp || oneEvent.data?.timestamp || properties?.timestamp
+
         return {
             event,
             properties: JSON.stringify(properties || {}),
             set: JSON.stringify($set || {}),
             ip,
             site_url,
-            now: now ?? global.bigQueryClient.timestamp(now),
-            sent_at: sent_at ?? global.bigQueryClient.timestamp(sent_at),
-            timestamp: timestamp ?? global.bigQueryClient.timestamp(timestamp),
+            now: now ? global.bigQueryClient.timestamp(now) : null,
+            sent_at: sent_at ? global.bigQueryClient.timestamp(sent_at) : null,
+            timestamp: timestamp ? global.bigQueryClient.timestamp(timestamp) : null,
         }
     })
 
