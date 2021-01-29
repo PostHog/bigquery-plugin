@@ -56,7 +56,8 @@ async function processEventBatch(batch, { config, global }) {
     }
 
     const rows = batch.map((oneEvent) => {
-        const { event, properties, $set, ip, site_url, now, sent_at, timestamp, ...misc } = oneEvent
+        const { event, properties, $set, ip, site_url, now, sent_at, ...misc } = oneEvent
+        const timestamp = oneEvent.timestamp || oneEvent.data?.timestamp
         return {
             event,
             properties: JSON.stringify(properties || {}),
