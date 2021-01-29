@@ -66,7 +66,7 @@ async function processEventBatch(batch, { config, global }) {
             ip,
             site_url,
             now: now ? global.bigQueryClient.timestamp(now) : null,
-            sent_at: sent_at ? global.bigQueryClient.timestamp(sent_at) : null,
+            sent_at: sent_at || now ? global.bigQueryClient.timestamp(sent_at || now) : null,
             timestamp: timestamp ? global.bigQueryClient.timestamp(timestamp) : null,
         }
     })
