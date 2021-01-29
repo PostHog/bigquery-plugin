@@ -56,7 +56,8 @@ async function processEventBatch(batch, { config, global }) {
     }
 
     const rows = batch.map((oneEvent) => {
-        const { event, properties, $set, ip, site_url, now, sent_at, ...misc } = oneEvent
+        const { event, properties, $set, site_url, now, sent_at, ...misc } = oneEvent
+        const ip = properties?.['$ip'] || oneEvent.ip
         const timestamp = oneEvent.timestamp || oneEvent.data?.timestamp || properties?.timestamp
 
         return {
