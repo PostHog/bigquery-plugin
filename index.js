@@ -30,6 +30,7 @@ async function setupPlugin({ global, attachments, config }) {
             { name: 'uuid', type: 'STRING' },
             { name: 'event', type: 'STRING' },
             { name: 'properties', type: 'STRING' },
+            { name: 'elements', type: 'STRING' },
             { name: 'set', type: 'STRING' },
             { name: 'set_once', type: 'STRING' },
             { name: 'distinct_id', type: 'STRING' },
@@ -61,11 +62,21 @@ async function processEventBatch(batch, { config, global }) {
         const { event, properties, $set, $set_once, distinct_id, team_id, site_url, now, sent_at, uuid, ..._discard } = oneEvent
         const ip = properties?.['$ip'] || oneEvent.ip
         const timestamp = oneEvent.timestamp || oneEvent.data?.timestamp || properties?.timestamp || now || sent_at
+        let ingestedProperties = properties
+        let elements = []
+
+        // only move prop to elements for the $autocapture action
+        if (event === '$autocapture' && properties['$elements']) {
+            const { $elements, ...props } = properties
+            ingestedProperties = props
+            elements = $elements
+        }
 
         return {
             uuid,
             event,
-            properties: JSON.stringify(properties || {}),
+            properties: JSON.stringify(ingestedProperties || {}),
+            elements: JSON.stringify(elements || {}),
             set: JSON.stringify($set || {}),
             set_once: JSON.stringify($set_once || {}),
             distinct_id,
