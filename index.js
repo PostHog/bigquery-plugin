@@ -27,13 +27,15 @@ async function setupPlugin({ global, attachments, config }) {
         console.log(`Creating BigQuery Table - ${config.datasetId}:${config.tableId}`)
 
         const schema = [
+            { name: 'uuid', type: 'STRING' },
             { name: 'event', type: 'STRING' },
             { name: 'properties', type: 'STRING' },
             { name: 'set', type: 'STRING' },
+            { name: 'set_once', type: 'STRING' },
+            { name: 'distinct_id', type: 'STRING' },
+            { name: 'team_id', type: 'INT64' },
             { name: 'ip', type: 'STRING' },
             { name: 'site_url', type: 'STRING' },
-            { name: 'now', type: 'TIMESTAMP' },
-            { name: 'sent_at', type: 'TIMESTAMP' },
             { name: 'timestamp', type: 'TIMESTAMP' },
         ]
 
@@ -56,18 +58,20 @@ async function processEventBatch(batch, { config, global }) {
     }
 
     const rows = batch.map((oneEvent) => {
-        const { event, properties, $set, site_url, now, sent_at, ...misc } = oneEvent
+        const { event, properties, $set, $set_once, distinct_id, team_id, site_url, now, sent_at, uuid, ..._discard } = oneEvent
         const ip = properties?.['$ip'] || oneEvent.ip
         const timestamp = oneEvent.timestamp || oneEvent.data?.timestamp || properties?.timestamp || now || sent_at
 
         return {
+            uuid,
             event,
             properties: JSON.stringify(properties || {}),
             set: JSON.stringify($set || {}),
+            set_once: JSON.stringify($set_once || {}),
+            distinct_id,
+            team_id,
             ip,
             site_url,
-            now: now ? global.bigQueryClient.timestamp(now) : null,
-            sent_at: sent_at || now ? global.bigQueryClient.timestamp(sent_at || now) : null,
             timestamp: timestamp ? global.bigQueryClient.timestamp(timestamp) : null,
         }
     })
