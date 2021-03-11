@@ -8,7 +8,8 @@
             "key": "googleCloudKeyJson",
             "name": "JSON file with your google cloud key",
             "type": "attachment",
-            "required": true
+            "required": true,
+            "secret": true
         },
         {
             "key": "datasetId",
