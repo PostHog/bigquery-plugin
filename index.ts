@@ -72,7 +72,7 @@ export const setupPlugin: BigQueryPlugin['setupPlugin'] = async (meta) => {
         limit: uploadMegabytes * 1024 * 1024,
         timeoutSeconds: uploadMinutes * 60,
         onFlush: async (batch) => {
-            await jobs.uploadBatchToBigQuery({ batch, batchId: Math.floor(Math.random() * 1000000) }).runNow()
+            await jobs.uploadBatchToBigQuery({ batch, batchId: Math.floor(Math.random() * 1000000), retriesPerformedSoFar: 0 }).runNow()
         },
     })
 
