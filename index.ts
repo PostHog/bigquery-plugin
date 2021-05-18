@@ -25,7 +25,7 @@ interface UploadJobPayload {
     batchId: number
 }
 
-class UploadError extends Error { }
+class UploadError extends Error {}
 
 class RetryQueue {
     baseInterval: number
@@ -59,7 +59,6 @@ class RetryQueue {
     }
 }
 
-
 export const jobs: PluginJobs<BigQueryMeta> = {
     uploadBatchToBigQuery: async (payload: UploadJobPayload, meta: BigQueryMeta) => {
         const { global } = meta
@@ -70,8 +69,7 @@ export const jobs: PluginJobs<BigQueryMeta> = {
             global.retryQueue.enqueue(payload.batch, payload.batchId)
         }
     },
-} 
-
+}
 
 export const setupPlugin: BigQueryPlugin['setupPlugin'] = async (meta) => {
     const { global, attachments, config, jobs } = meta
@@ -97,7 +95,7 @@ export const setupPlugin: BigQueryPlugin['setupPlugin'] = async (meta) => {
 
     global.buffer = createBuffer({
         limit: uploadMegabytes * 1024 * 1024,
-        timeoutSeconds: uploadMinutes * 60, 
+        timeoutSeconds: uploadMinutes * 60,
         onFlush: async (batch) => {
             await jobs.uploadBatchToBigQuery({ batch, batchId: Math.floor(Math.random() * 1000000) }).runNow()
         },
@@ -134,16 +132,14 @@ export const setupPlugin: BigQueryPlugin['setupPlugin'] = async (meta) => {
         ]
 
         try {
-            await global.bigQueryClient
-                .dataset(config.datasetId)
-                .createTable(config.tableId, { schema })
+            await global.bigQueryClient.dataset(config.datasetId).createTable(config.tableId, { schema })
         } catch (error) {
             // a different worker already created the table
             if (!error.message.includes('Already Exists')) {
                 throw new Error()
             }
         }
-    } 
+    }
 }
 
 export async function onEvent(event: PluginEvent, { global }: BigQueryMeta) {
@@ -151,8 +147,19 @@ export async function onEvent(event: PluginEvent, { global }: BigQueryMeta) {
         throw new Error('No BigQuery client initialized!')
     }
 
-
-    const { event: eventName, properties, $set, $set_once, distinct_id, team_id, site_url, now, sent_at, uuid, ..._discard } = event
+    const {
+        event: eventName,
+        properties,
+        $set,
+        $set_once,
+        distinct_id,
+        team_id,
+        site_url,
+        now,
+        sent_at,
+        uuid,
+        ..._discard
+    } = event
     const ip = properties?.['$ip'] || event.ip
     const timestamp = event.timestamp || properties?.timestamp || now || sent_at
     let ingestedProperties = properties
@@ -183,7 +190,6 @@ export async function onEvent(event: PluginEvent, { global }: BigQueryMeta) {
         global.buffer.add(parsedEvent)
     }
 }
-
 
 export async function sendBatchToBigQuery(rows: PluginEvent[], { global }: BigQueryMeta) {
     console.log(`Uploading ${rows.length} event ${rows.length > 1 ? 'rows' : 'row'} to BigQuery`)
