@@ -6,7 +6,6 @@ type BigQueryMeta = PluginMeta<{
     global: {
         buffer: ReturnType<typeof createBuffer>
         eventsToIgnore: Set<string>
-        retryQueue: RetryQueue
         bigQueryClient: BigQuery
         bigQueryTable: Table
     }
@@ -23,50 +22,26 @@ type BigQueryPlugin = Plugin<BigQueryMeta>
 interface UploadJobPayload {
     batch: PluginEvent[]
     batchId: number
+    retriesPerformedSoFar: number
 }
 
 class UploadError extends Error {}
 
-class RetryQueue {
-    baseInterval: number
-    meta: BigQueryMeta
-    requestRetriesMap: Map<number, number>
-
-    constructor(meta: BigQueryMeta) {
-        this.baseInterval = 3000 // ms
-        this.meta = meta
-        this.requestRetriesMap = new Map<number, number>()
-    }
-
-    async enqueue(batch: PluginEvent[], id: number) {
-        const { jobs } = this.meta
-        let retriesPerformedSoFar = 0
-        if (!this.requestRetriesMap.has(id)) {
-            this.requestRetriesMap.set(id, 0)
-        } else {
-            retriesPerformedSoFar = this.requestRetriesMap.get(id)!
-            if (retriesPerformedSoFar === 15) {
-                this.requestRetriesMap.delete(id)
-                return
-            }
-            this.requestRetriesMap.set(id, retriesPerformedSoFar + 1)
-        }
-
-        const nextRetryMs = 2 ** retriesPerformedSoFar * this.baseInterval
-        console.log(`Enqueued batch ${id} for retry in ${nextRetryMs}ms`)
-
-        await jobs.uploadBatchToBigQuery({ batch, batchId: id }).runIn(nextRetryMs, 'milliseconds')
-    }
-}
-
 export const jobs: PluginJobs<BigQueryMeta> = {
     uploadBatchToBigQuery: async (payload: UploadJobPayload, meta: BigQueryMeta) => {
-        const { global } = meta
+        const { jobs } = meta
         try {
             await sendBatchToBigQuery(payload.batch, meta)
         } catch (err) {
             console.error(err)
-            global.retryQueue.enqueue(payload.batch, payload.batchId)
+            if (payload.retriesPerformedSoFar < 15) {
+                const nextRetryMs = 2 ** payload.retriesPerformedSoFar * 3000
+                console.log(`Enqueued batch ${payload.batchId} for retry in ${nextRetryMs}ms`)
+
+                await jobs
+                    .uploadBatchToBigQuery({ ...payload, retriesPerformedSoFar: payload.retriesPerformedSoFar + 1 })
+                    .runIn(nextRetryMs, 'milliseconds')
+            }
         }
     },
 }
@@ -104,8 +79,6 @@ export const setupPlugin: BigQueryPlugin['setupPlugin'] = async (meta) => {
     global.eventsToIgnore = new Set(
         config.eventsToIgnore ? config.eventsToIgnore.split(',').map((event) => event.trim()) : null
     )
-
-    global.retryQueue = new RetryQueue(meta)
 
     try {
         // check if the table exists
