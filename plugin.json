@@ -2,7 +2,7 @@
     "name": "BigQuery Export",
     "url": "https://github.com/PostHog/bigquery-plugin",
     "description": "Sends events to a BigQuery database on ingestion.",
-    "main": "index.js",
+    "main": "index.ts",
     "config": [
         {
             "key": "googleCloudKeyJson",
@@ -23,6 +23,27 @@
             "name": "Table ID",
             "type": "string",
             "required": true
+        },
+        {
+            "key": "eventsToIgnore",
+            "name": "Events to ignore",
+            "type": "string",
+            "default": "$feature_flag_called",
+            "hint": "Comma separated list of events to ignore"
+        },
+        {
+            "key": "uploadMinutes",
+            "name": "Upload at most every X minutes",
+            "type": "string",
+            "default": "1",
+            "hint": "If there are events to upload and this many minutes has passed since the last upload, send the events to S3. The value must be between 1 and 60 minutes."
+        },
+        {
+            "key": "uploadMegabytes",
+            "name": "Maximum upload size in megabytes",
+            "type": "string",
+            "default": "1",
+            "hint": "Always keep the uploaded files below this size limit, uploading more frequently than the time limit if needed. Events are kept in memory until then, so make sure your server has enough of it. The value must be between 1 and 100 MB."
         }
     ]
 }
