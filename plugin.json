@@ -3,6 +3,7 @@
     "url": "https://github.com/PostHog/bigquery-plugin",
     "description": "Sends events to a BigQuery database on ingestion.",
     "main": "index.ts",
+    "posthogVersion": ">= 1.25.0",
     "config": [
         {
             "key": "googleCloudKeyJson",
