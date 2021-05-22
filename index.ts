@@ -1,8 +1,8 @@
 import { createBuffer } from '@posthog/plugin-contrib'
-import { Plugin, PluginMeta, PluginEvent, PluginJobs } from '@posthog/plugin-scaffold'
+import { Plugin, PluginMeta, PluginEvent } from '@posthog/plugin-scaffold'
 import { BigQuery, Table } from '@google-cloud/bigquery'
 
-type BigQueryMeta = PluginMeta<{
+type BigQueryPlugin = Plugin<{
     global: {
         buffer: ReturnType<typeof createBuffer>
         eventsToIgnore: Set<string>
@@ -16,8 +16,10 @@ type BigQueryMeta = PluginMeta<{
         uploadMegabytes: string
         eventsToIgnore: string
     }
+    jobs: {
+        uploadBatchToBigQuery: UploadJobPayload
+    }
 }>
-type BigQueryPlugin = Plugin<BigQueryMeta>
 
 interface UploadJobPayload {
     batch: PluginEvent[]
@@ -27,8 +29,8 @@ interface UploadJobPayload {
 
 class UploadError extends Error {}
 
-export const jobs: PluginJobs<BigQueryMeta> = {
-    uploadBatchToBigQuery: async (payload: UploadJobPayload, meta: BigQueryMeta) => {
+export const jobs: BigQueryPlugin['jobs'] = {
+    uploadBatchToBigQuery: async (payload, meta) => {
         const { jobs } = meta
         try {
             await sendBatchToBigQuery(payload.batch, meta)
@@ -115,7 +117,7 @@ export const setupPlugin: BigQueryPlugin['setupPlugin'] = async (meta) => {
     }
 }
 
-export async function onEvent(event: PluginEvent, { global }: BigQueryMeta) {
+export const onEvent: BigQueryPlugin['onEvent'] = (event, { global }) => {
     if (!global.bigQueryTable) {
         throw new Error('No BigQuery client initialized!')
     }
@@ -164,7 +166,7 @@ export async function onEvent(event: PluginEvent, { global }: BigQueryMeta) {
     }
 }
 
-export async function sendBatchToBigQuery(rows: PluginEvent[], { global }: BigQueryMeta) {
+export async function sendBatchToBigQuery(rows: PluginEvent[], { global }: PluginMeta<BigQueryPlugin>) {
     console.log(`Uploading ${rows.length} event ${rows.length > 1 ? 'rows' : 'row'} to BigQuery`)
     try {
         await global.bigQueryTable.insert(rows)
