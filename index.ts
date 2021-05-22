@@ -12,7 +12,7 @@ type BigQueryPlugin = Plugin<{
     config: {
         datasetId: string
         tableId: string
-        uploadMinutes: string
+        uploadSeconds: string
         uploadMegabytes: string
         eventsToIgnore: string
     }
@@ -62,7 +62,7 @@ export const setupPlugin: BigQueryPlugin['setupPlugin'] = async (meta) => {
 
     const credentials = JSON.parse(attachments.googleCloudKeyJson.contents.toString())
     const uploadMegabytes = Math.max(1, Math.min(parseInt(config.uploadMegabytes) || 1, 100))
-    const uploadMinutes = Math.max(1, Math.min(parseInt(config.uploadMinutes) || 1, 60))
+    const uploadSeconds = Math.max(1, Math.min(parseInt(config.uploadSeconds) || 30, 600))
 
     global.bigQueryClient = new BigQuery({
         projectId: credentials['project_id'],
@@ -72,7 +72,7 @@ export const setupPlugin: BigQueryPlugin['setupPlugin'] = async (meta) => {
 
     global.buffer = createBuffer({
         limit: uploadMegabytes * 1024 * 1024,
-        timeoutSeconds: uploadMinutes * 60,
+        timeoutSeconds: uploadSeconds,
         onFlush: async (batch) => {
             await jobs.uploadBatchToBigQuery({ batch, batchId: Math.floor(Math.random() * 1000000), retriesPerformedSoFar: 0 }).runNow()
         },
