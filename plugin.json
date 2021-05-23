@@ -43,8 +43,8 @@
             "key": "exportEventsBufferSeconds",
             "name": "Export events at least every X seconds",
             "type": "string",
-            "default": "30",
-            "hint": "Default 30 seconds. If there are events to upload and this many seconds has passed since the last upload, then upload the queued events. The value must be between 1 and 600 seconds."
+            "default": "10",
+            "hint": "Default 10 seconds. If there are events to upload and this many seconds has passed since the last upload, then upload the queued events. The value must be between 1 and 600 seconds."
         }
     ]
 }
