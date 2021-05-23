@@ -2,7 +2,8 @@
     "name": "BigQuery Export",
     "url": "https://github.com/PostHog/bigquery-plugin",
     "description": "Sends events to a BigQuery database on ingestion.",
-    "main": "index.js",
+    "main": "index.ts",
+    "posthogVersion": ">= 1.25.0",
     "config": [
         {
             "key": "googleCloudKeyJson",
@@ -23,6 +24,27 @@
             "name": "Table ID",
             "type": "string",
             "required": true
+        },
+        {
+            "key": "exportEventsToIgnore",
+            "name": "Events to ignore",
+            "type": "string",
+            "default": "$feature_flag_called",
+            "hint": "Comma separated list of events to ignore"
+        },
+        {
+            "key": "exportEventsBufferBytes",
+            "name": "Maximum upload size in bytes",
+            "type": "string",
+            "default": "1048576",
+            "hint": "Default 1MB. Upload events after buffering this many of them. BigQuery has a 250KB limit per row, so events are still sent individually after the buffer is flushed. The value must be between 1 and 10 MB."
+        },
+        {
+            "key": "exportEventsBufferSeconds",
+            "name": "Export events at least every X seconds",
+            "type": "string",
+            "default": "30",
+            "hint": "Default 30 seconds. If there are events to upload and this many seconds has passed since the last upload, then upload the queued events. The value must be between 1 and 600 seconds."
         }
     ]
 }
