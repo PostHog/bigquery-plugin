@@ -1,5 +1,5 @@
 import { createBuffer } from '@posthog/plugin-contrib'
-import { Plugin, PluginMeta, PluginEvent } from '@posthog/plugin-scaffold'
+import { Plugin, PluginMeta, PluginEvent, RetryError } from '@posthog/plugin-scaffold'
 import { BigQuery, Table } from '@google-cloud/bigquery'
 
 type BigQueryPlugin = Plugin<{
@@ -29,8 +29,6 @@ interface UploadJobPayload {
     batchId: number
     retriesPerformedSoFar: number
 }
-
-class RetryError extends Error {}
 
 export const setupPlugin: BigQueryPlugin['setupPlugin'] = async (meta) => {
     const { global, attachments, config } = meta
