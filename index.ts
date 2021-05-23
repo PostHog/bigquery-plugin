@@ -92,7 +92,6 @@ export async function exportEventsToBigQuery(events: PluginEvent[], { global }: 
     if (!global.bigQueryTable) {
         throw new Error('No BigQuery client initialized!')
     }
-    console.log(`Uploading ${events.length} event ${events.length > 1 ? 'events' : 'row'} to BigQuery`)
     try {
         const rows = events.map((event) => {
             const {
@@ -135,7 +134,9 @@ export async function exportEventsToBigQuery(events: PluginEvent[], { global }: 
             }
         })
         await global.bigQueryTable.insert(rows)
+        console.log(`Inserted ${events.length} ${events.length > 1 ? 'events' : 'event'} to BigQuery`)
     } catch (error) {
+        console.error(`Error inserting ${events.length} ${events.length > 1 ? 'events' : 'event'} into BigQuery: `, error)
         throw new RetryError(`Error inserting into BigQuery! ${JSON.stringify(error.errors)}`)
     }
 }
