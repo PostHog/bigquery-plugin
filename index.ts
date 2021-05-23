@@ -85,10 +85,10 @@ export const setupPlugin: BigQueryPlugin['setupPlugin'] = async (meta) => {
         }
     }
 
-    setupBufferExportCode(meta, exportEvents)
+    setupBufferExportCode(meta, exportEventsToBigQuery)
 }
 
-export async function exportEvents(events: PluginEvent[], { global }: PluginMeta<BigQueryPlugin>) {
+export async function exportEventsToBigQuery(events: PluginEvent[], { global }: PluginMeta<BigQueryPlugin>) {
     if (!global.bigQueryTable) {
         throw new Error('No BigQuery client initialized!')
     }
@@ -122,7 +122,7 @@ export async function exportEvents(events: PluginEvent[], { global }: PluginMeta
 
             return {
                 uuid,
-                eventName,
+                event: eventName,
                 properties: JSON.stringify(ingestedProperties || {}),
                 elements: JSON.stringify(elements || {}),
                 set: JSON.stringify($set || {}),
