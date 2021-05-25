@@ -1,6 +1,8 @@
 import { createBuffer } from '@posthog/plugin-contrib'
-import { Plugin, PluginMeta, PluginEvent, RetryError } from '@posthog/plugin-scaffold'
+import { Plugin, PluginMeta, PluginEvent } from '@posthog/plugin-scaffold'
 import { BigQuery, Table } from '@google-cloud/bigquery'
+
+class RetryError extends Error {}
 
 type BigQueryPlugin = Plugin<{
     global: {
