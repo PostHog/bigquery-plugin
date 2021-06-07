@@ -197,7 +197,7 @@ export async function exportEventsToBigQuery(events: PluginEvent[], { global }: 
         })
         
         const start = Date.now()
-        const response = await global.bigQueryTable.insert(rows, insertOptions)
+        await global.bigQueryTable.insert(rows, insertOptions)
         const end = Date.now() - start
 
         console.log(`Inserted ${events.length} ${events.length > 1 ? 'events' : 'event'} to BigQuery. Took ${end/1000} seconds.`)
