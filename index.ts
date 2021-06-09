@@ -45,10 +45,10 @@ export const setupPlugin: BigQueryPlugin['setupPlugin'] = async (meta) => {
         throw new Error('Table ID not provided!')
     }
 
-    if (config.deduplicateEvents === 'Yes') {
-        global.deduplicateEvents = true
-    } else {
+    if (config.deduplicateEvents === 'No') {
         global.deduplicateEvents = false
+    } else {
+        global.deduplicateEvents = true
     }
 
     const credentials = JSON.parse(attachments.googleCloudKeyJson.contents.toString())
