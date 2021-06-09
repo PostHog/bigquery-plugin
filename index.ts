@@ -1,8 +1,6 @@
 import { createBuffer } from '@posthog/plugin-contrib'
-import { Plugin, PluginMeta, PluginEvent } from '@posthog/plugin-scaffold'
+import { Plugin, PluginMeta, PluginEvent, RetryError } from '@posthog/plugin-scaffold'
 import { BigQuery, Table, TableField, TableMetadata } from '@google-cloud/bigquery'
-
-class RetryError extends Error {}
 
 type BigQueryPlugin = Plugin<{
     global: {
@@ -47,7 +45,7 @@ export const setupPlugin: BigQueryPlugin['setupPlugin'] = async (meta) => {
         throw new Error('Table ID not provided!')
     }
 
-    if (config.deduplicateEvents in ['true', 'True', 't']) {
+    if (config.deduplicateEvents === 'Yes') {
         global.deduplicateEvents = true
     } else {
         global.deduplicateEvents = false
@@ -100,7 +98,6 @@ export const setupPlugin: BigQueryPlugin['setupPlugin'] = async (meta) => {
                 metadata.schema.fields = metadata.schema.fields.concat(fieldsToAdd)
                 ;[result] = await global.bigQueryTable.setMetadata(metadata)
             } catch (error) {
-                console.error(error)
                 const fieldsToStillAdd = global.bigQueryTableFields.filter(
                     ({ name }) => !result.schema?.fields?.find((f: any) => f.name === name)
                 )

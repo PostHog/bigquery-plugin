@@ -49,9 +49,10 @@
         {
             "key": "deduplicateEvents",
             "name": "Attempt deduplicating events",
-            "type": "string",
-            "default": "true",
-            "hint": "Default true. We try to deduplicate events being sent to Bigquery if set to true. Set to false to increase Bigquery insertion quota limit"
+            "type": "choice",
+            "choices": ["Yes", "No"],
+            "default": "Yes",
+            "hint": "Default 'Yes'. We try to deduplicate events being sent to Bigquery if set to 'Yes'. Set to 'No' to increase Bigquery insertion quota limit"
         }
     ]
 }
