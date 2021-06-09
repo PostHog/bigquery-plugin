@@ -52,7 +52,7 @@
             "type": "choice",
             "choices": ["Yes", "No"],
             "default": "Yes",
-            "hint": "Default 'Yes'. We try to deduplicate events being sent to Bigquery if set to 'Yes'. Set to 'No' to increase Bigquery insertion quota limit"
+            "hint": "Default 'Yes'. We try to deduplicate events being sent to Bigquery if set to 'Yes'. Set to 'No' if you're sending a lot of events and getting Quota Exceeded errors."
         }
     ]
 }
