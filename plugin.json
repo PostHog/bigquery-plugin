@@ -48,7 +48,7 @@
         },
         {
             "key": "deduplicateEvents",
-            "name": "Attempt deduplicating events",
+            "name": "Attempt deduplicating events?",
             "type": "choice",
             "choices": ["Yes", "No"],
             "default": "Yes",
