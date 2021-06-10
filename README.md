@@ -15,4 +15,7 @@ Sends events to a BigQuery database on ingestion.
 ## Troubleshooting
 
 ### Duplicate Events
-If you find duplicate events in Bigquery, follow these [official docs on Bigquery](https://cloud.google.com/bigquery/streaming-data-into-bigquery#manually_removing_duplicates) to manually remove duplicates.
+
+There's a very rare case when duplicate events appear in Bigquery. This happens due to network errors, where the export seems to have failed, yet it actually reaches Bigquery.
+
+While this shouldn't happen, if you find duplicate events in Bigquery, follow these [official docs on Bigquery](https://cloud.google.com/bigquery/streaming-data-into-bigquery#manually_removing_duplicates) to manually remove the duplicates.
