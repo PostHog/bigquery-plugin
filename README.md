@@ -11,3 +11,8 @@ Sends events to a BigQuery database on ingestion.
    1. Enter your Dataset ID
    1. Enter your Table ID 
 1. Watch events roll into BigQuery
+
+## Troubleshooting
+
+### Duplicate Events
+If you find duplicate events in Bigquery, follow these [official docs on Bigquery](https://cloud.google.com/bigquery/streaming-data-into-bigquery#manually_removing_duplicates) to manually remove duplicates.

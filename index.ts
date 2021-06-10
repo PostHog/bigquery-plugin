@@ -11,7 +11,6 @@ type BigQueryPlugin = Plugin<{
         exportEventsBuffer: ReturnType<typeof createBuffer>
         exportEventsToIgnore: Set<string>
         exportEventsWithRetry: (payload: UploadJobPayload, meta: PluginMeta<BigQueryPlugin>) => Promise<void>
-        deduplicateEvents: boolean
     }
     config: {
         datasetId: string
@@ -20,7 +19,6 @@ type BigQueryPlugin = Plugin<{
         exportEventsBufferBytes: string
         exportEventsBufferSeconds: string
         exportEventsToIgnore: string
-        deduplicateEvents: string
     }
     jobs: {
         exportEventsWithRetry: UploadJobPayload
@@ -43,12 +41,6 @@ export const setupPlugin: BigQueryPlugin['setupPlugin'] = async (meta) => {
     }
     if (!config.tableId) {
         throw new Error('Table ID not provided!')
-    }
-
-    if (config.deduplicateEvents === 'No') {
-        global.deduplicateEvents = false
-    } else {
-        global.deduplicateEvents = true
     }
 
     const credentials = JSON.parse(attachments.googleCloudKeyJson.contents.toString())
@@ -185,10 +177,6 @@ export async function exportEventsToBigQuery(events: PluginEvent[], { global }: 
                     timestamp: timestamp,
                     bq_ingested_timestamp: new Date().toISOString(),
                 }
-            }
-
-            if (global.deduplicateEvents) {
-                object.insertId = uuid
             }
             return object
         })
