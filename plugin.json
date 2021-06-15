@@ -37,7 +37,7 @@
             "name": "Maximum upload size in bytes",
             "type": "string",
             "default": "1048576",
-            "hint": "Default 1MB. Upload events after buffering this many of them. BigQuery has a 250KB limit per row, so events are still sent individually after the buffer is flushed. The value must be between 1 and 10 MB."
+            "hint": "Default 1MB. Upload events after buffering this many of them. The value must be between 1 MB and 10 MB."
         },
         {
             "key": "exportEventsBufferSeconds",

@@ -1,13 +1,12 @@
 import { createBuffer } from '@posthog/plugin-contrib'
-import { Plugin, PluginMeta, PluginEvent } from '@posthog/plugin-scaffold'
-import { BigQuery, Table } from '@google-cloud/bigquery'
-
-class RetryError extends Error {}
+import { Plugin, PluginMeta, PluginEvent, RetryError } from '@posthog/plugin-scaffold'
+import { BigQuery, Table, TableField, TableMetadata } from '@google-cloud/bigquery'
 
 type BigQueryPlugin = Plugin<{
     global: {
         bigQueryClient: BigQuery
         bigQueryTable: Table
+        bigQueryTableFields: TableField[]
 
         exportEventsBuffer: ReturnType<typeof createBuffer>
         exportEventsToIgnore: Set<string>
@@ -48,12 +47,62 @@ export const setupPlugin: BigQueryPlugin['setupPlugin'] = async (meta) => {
     global.bigQueryClient = new BigQuery({
         projectId: credentials['project_id'],
         credentials,
+        autoRetry: false,
     })
     global.bigQueryTable = global.bigQueryClient.dataset(config.datasetId).table(config.tableId)
 
+    global.bigQueryTableFields = [
+        { name: 'uuid', type: 'STRING' },
+        { name: 'event', type: 'STRING' },
+        { name: 'properties', type: 'STRING' },
+        { name: 'elements', type: 'STRING' },
+        { name: 'set', type: 'STRING' },
+        { name: 'set_once', type: 'STRING' },
+        { name: 'distinct_id', type: 'STRING' },
+        { name: 'team_id', type: 'INT64' },
+        { name: 'ip', type: 'STRING' },
+        { name: 'site_url', type: 'STRING' },
+        { name: 'timestamp', type: 'TIMESTAMP' },
+        { name: 'bq_ingested_timestamp', type: 'TIMESTAMP' },
+    ]
+
     try {
-        // check if the table exists
-        await global.bigQueryTable.get()
+        const [metadata]: TableMetadata[] = await global.bigQueryTable.getMetadata()
+
+        if (!metadata.schema || !metadata.schema.fields) {
+            throw new Error("Can not get metadata for table. Please check if the table schema is defined.")
+        }
+
+        const existingFields = metadata.schema.fields
+        const fieldsToAdd = global.bigQueryTableFields.filter(
+            ({ name }) => !existingFields.find((f: any) => f.name === name)
+        )
+
+        if (fieldsToAdd.length > 0) {
+            console.info(
+                `Incomplete schema on BigQuery table! Adding the following fields to reach parity: ${JSON.stringify(
+                    fieldsToAdd
+                )}`
+            )
+
+            let result: TableMetadata
+            try {
+                metadata.schema.fields = metadata.schema.fields.concat(fieldsToAdd)
+                ;[result] = await global.bigQueryTable.setMetadata(metadata)
+            } catch (error) {
+                const fieldsToStillAdd = global.bigQueryTableFields.filter(
+                    ({ name }) => !result.schema?.fields?.find((f: any) => f.name === name)
+                )
+
+                if (fieldsToStillAdd.length > 0) {
+                    throw new Error(
+                        `Tried adding fields ${JSON.stringify(fieldsToAdd)}, but ${JSON.stringify(
+                            fieldsToStillAdd
+                        )} still to add. Can not start plugin.`
+                    )
+                }
+            }
+        }
     } catch (error) {
         // some other error? abort!
         if (!error.message.includes('Not found')) {
@@ -61,26 +110,14 @@ export const setupPlugin: BigQueryPlugin['setupPlugin'] = async (meta) => {
         }
         console.log(`Creating BigQuery Table - ${config.datasetId}:${config.tableId}`)
 
-        const schema = [
-            { name: 'uuid', type: 'STRING' },
-            { name: 'event', type: 'STRING' },
-            { name: 'properties', type: 'STRING' },
-            { name: 'elements', type: 'STRING' },
-            { name: 'set', type: 'STRING' },
-            { name: 'set_once', type: 'STRING' },
-            { name: 'distinct_id', type: 'STRING' },
-            { name: 'team_id', type: 'INT64' },
-            { name: 'ip', type: 'STRING' },
-            { name: 'site_url', type: 'STRING' },
-            { name: 'timestamp', type: 'TIMESTAMP' },
-        ]
-
         try {
-            await global.bigQueryClient.dataset(config.datasetId).createTable(config.tableId, { schema })
+            await global.bigQueryClient
+                .dataset(config.datasetId)
+                .createTable(config.tableId, { schema: global.bigQueryTableFields })
         } catch (error) {
             // a different worker already created the table
             if (!error.message.includes('Already Exists')) {
-                throw new Error()
+                throw error
             }
         }
     }
@@ -89,6 +126,12 @@ export const setupPlugin: BigQueryPlugin['setupPlugin'] = async (meta) => {
 }
 
 export async function exportEventsToBigQuery(events: PluginEvent[], { global }: PluginMeta<BigQueryPlugin>) {
+    const insertOptions = {
+        createInsertId: false,
+        partialRetries: 0,
+        raw: true,
+    }
+
     if (!global.bigQueryTable) {
         throw new Error('No BigQuery client initialized!')
     }
@@ -119,24 +162,36 @@ export async function exportEventsToBigQuery(events: PluginEvent[], { global }: 
                 elements = $elements
             }
 
-            return {
-                uuid,
-                event: eventName,
-                properties: JSON.stringify(ingestedProperties || {}),
-                elements: JSON.stringify(elements || {}),
-                set: JSON.stringify($set || {}),
-                set_once: JSON.stringify($set_once || {}),
-                distinct_id,
-                team_id,
-                ip,
-                site_url,
-                timestamp: timestamp ? global.bigQueryClient.timestamp(timestamp) : null,
+            const object: {json: Record<string, any>, insertId?: string} = {
+                json: {
+                    uuid,
+                    event: eventName,
+                    properties: JSON.stringify(ingestedProperties || {}),
+                    elements: JSON.stringify(elements || {}),
+                    set: JSON.stringify($set || {}),
+                    set_once: JSON.stringify($set_once || {}),
+                    distinct_id,
+                    team_id,
+                    ip,
+                    site_url,
+                    timestamp: timestamp,
+                    bq_ingested_timestamp: new Date().toISOString(),
+                }
             }
+            return object
         })
-        await global.bigQueryTable.insert(rows)
-        console.log(`Inserted ${events.length} ${events.length > 1 ? 'events' : 'event'} to BigQuery`)
+        
+        const start = Date.now()
+        await global.bigQueryTable.insert(rows, insertOptions)
+        const end = Date.now() - start
+
+        console.log(`Inserted ${events.length} ${events.length > 1 ? 'events' : 'event'} to BigQuery. Took ${end/1000} seconds.`)
+
     } catch (error) {
-        console.error(`Error inserting ${events.length} ${events.length > 1 ? 'events' : 'event'} into BigQuery: `, error)
+        console.error(
+            `Error inserting ${events.length} ${events.length > 1 ? 'events' : 'event'} into BigQuery: `,
+            error
+        )
         throw new RetryError(`Error inserting into BigQuery! ${JSON.stringify(error.errors)}`)
     }
 }
@@ -147,7 +202,8 @@ const setupBufferExportCode = (
     meta: PluginMeta<BigQueryPlugin>,
     exportEvents: (events: PluginEvent[], meta: PluginMeta<BigQueryPlugin>) => Promise<void>
 ) => {
-    const uploadBytes = Math.max(1, Math.min(parseInt(meta.config.exportEventsBufferBytes) || 1024 * 1024, 100))
+
+    const uploadBytes = Math.max(1024*1024, Math.min(parseInt(meta.config.exportEventsBufferBytes) || 1024 * 1024, 1024*1024*10))
     const uploadSeconds = Math.max(1, Math.min(parseInt(meta.config.exportEventsBufferSeconds) || 30, 600))
 
     meta.global.exportEventsToIgnore = new Set(
@@ -199,12 +255,12 @@ const setupBufferExportCode = (
 
 export const jobs: BigQueryPlugin['jobs'] = {
     exportEventsWithRetry: async (payload, meta) => {
-        meta.global.exportEventsWithRetry(payload, meta)
+        await meta.global.exportEventsWithRetry(payload, meta)
     },
 }
 
 export const onEvent: BigQueryPlugin['onEvent'] = (event, { global }) => {
     if (!global.exportEventsToIgnore.has(event.event)) {
-        global.exportEventsBuffer.add(event)
+        global.exportEventsBuffer.add(event, JSON.stringify(event).length)
     }
 }

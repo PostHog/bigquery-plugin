@@ -11,3 +11,11 @@ Sends events to a BigQuery database on ingestion.
    1. Enter your Dataset ID
    1. Enter your Table ID 
 1. Watch events roll into BigQuery
+
+## Troubleshooting
+
+### Duplicate Events
+
+There's a very rare case when duplicate events appear in Bigquery. This happens due to network errors, where the export seems to have failed, yet it actually reaches Bigquery.
+
+While this shouldn't happen, if you find duplicate events in Bigquery, follow these [official docs on Bigquery](https://cloud.google.com/bigquery/streaming-data-into-bigquery#manually_removing_duplicates) to manually remove the duplicates.
