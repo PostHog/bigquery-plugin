@@ -155,8 +155,8 @@ export async function exportEventsToBigQuery(events: PluginEvent[], { global }: 
             let ingestedProperties = properties
             let elements = []
 
-            // only move prop to elements for the $autocapture action
-            if (eventName === '$autocapture' && properties && '$elements' in properties) {
+            // only move prop to elements if $elements in properties
+            if (properties && '$elements' in properties) {
                 const { $elements, ...props } = properties
                 ingestedProperties = props
                 elements = $elements
