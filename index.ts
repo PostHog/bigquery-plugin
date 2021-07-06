@@ -19,6 +19,7 @@ type BigQueryPlugin = Plugin<{
         exportEventsBufferBytes: string
         exportEventsBufferSeconds: string
         exportEventsToIgnore: string
+        exportElementsOnAnyEvent: 'Yes' | 'No'
     }
     jobs: {
         exportEventsWithRetry: UploadJobPayload
@@ -70,7 +71,7 @@ export const setupPlugin: BigQueryPlugin['setupPlugin'] = async (meta) => {
         const [metadata]: TableMetadata[] = await global.bigQueryTable.getMetadata()
 
         if (!metadata.schema || !metadata.schema.fields) {
-            throw new Error("Can not get metadata for table. Please check if the table schema is defined.")
+            throw new Error('Can not get metadata for table. Please check if the table schema is defined.')
         }
 
         const existingFields = metadata.schema.fields
@@ -125,7 +126,7 @@ export const setupPlugin: BigQueryPlugin['setupPlugin'] = async (meta) => {
     setupBufferExportCode(meta, exportEventsToBigQuery)
 }
 
-export async function exportEventsToBigQuery(events: PluginEvent[], { global }: PluginMeta<BigQueryPlugin>) {
+export async function exportEventsToBigQuery(events: PluginEvent[], { global, config }: PluginMeta<BigQueryPlugin>) {
     const insertOptions = {
         createInsertId: false,
         partialRetries: 0,
@@ -155,13 +156,21 @@ export async function exportEventsToBigQuery(events: PluginEvent[], { global }: 
             let ingestedProperties = properties
             let elements = []
 
-            if (properties && '$elements' in properties) {
+            const shouldExportElementsForEvent =
+                eventName === '$autocapture' || config.exportElementsOnAnyEvent === 'Yes'
+
+            if (
+                shouldExportElementsForEvent &&
+                properties &&
+                '$elements' in properties &&
+                Array.isArray(properties['$elements'])
+            ) {
                 const { $elements, ...props } = properties
                 ingestedProperties = props
                 elements = $elements
             }
 
-            const object: {json: Record<string, any>, insertId?: string} = {
+            const object: { json: Record<string, any>; insertId?: string } = {
                 json: {
                     uuid,
                     event: eventName,
@@ -175,17 +184,20 @@ export async function exportEventsToBigQuery(events: PluginEvent[], { global }: 
                     site_url,
                     timestamp: timestamp,
                     bq_ingested_timestamp: new Date().toISOString(),
-                }
+                },
             }
             return object
         })
-        
+
         const start = Date.now()
         await global.bigQueryTable.insert(rows, insertOptions)
         const end = Date.now() - start
 
-        console.log(`Inserted ${events.length} ${events.length > 1 ? 'events' : 'event'} to BigQuery. Took ${end/1000} seconds.`)
-
+        console.log(
+            `Inserted ${events.length} ${events.length > 1 ? 'events' : 'event'} to BigQuery. Took ${
+                end / 1000
+            } seconds.`
+        )
     } catch (error) {
         console.error(
             `Error inserting ${events.length} ${events.length > 1 ? 'events' : 'event'} into BigQuery: `,
@@ -201,8 +213,10 @@ const setupBufferExportCode = (
     meta: PluginMeta<BigQueryPlugin>,
     exportEvents: (events: PluginEvent[], meta: PluginMeta<BigQueryPlugin>) => Promise<void>
 ) => {
-
-    const uploadBytes = Math.max(1024*1024, Math.min(parseInt(meta.config.exportEventsBufferBytes) || 1024 * 1024, 1024*1024*10))
+    const uploadBytes = Math.max(
+        1024 * 1024,
+        Math.min(parseInt(meta.config.exportEventsBufferBytes) || 1024 * 1024, 1024 * 1024 * 10)
+    )
     const uploadSeconds = Math.max(1, Math.min(parseInt(meta.config.exportEventsBufferSeconds) || 30, 600))
 
     meta.global.exportEventsToIgnore = new Set(
