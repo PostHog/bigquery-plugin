@@ -7,22 +7,13 @@ type BigQueryPlugin = Plugin<{
         bigQueryClient: BigQuery
         bigQueryTable: Table
         bigQueryTableFields: TableField[]
-
-        exportEventsBuffer: ReturnType<typeof createBuffer>
         exportEventsToIgnore: Set<string>
-        exportEventsWithRetry: (payload: UploadJobPayload, meta: PluginMeta<BigQueryPlugin>) => Promise<void>
     }
     config: {
         datasetId: string
         tableId: string
-
-        exportEventsBufferBytes: string
-        exportEventsBufferSeconds: string
         exportEventsToIgnore: string
         exportElementsOnAnyEvent: 'Yes' | 'No'
-    }
-    jobs: {
-        exportEventsWithRetry: UploadJobPayload
     }
 }>
 
@@ -43,6 +34,12 @@ export const setupPlugin: BigQueryPlugin['setupPlugin'] = async (meta) => {
     if (!config.tableId) {
         throw new Error('Table ID not provided!')
     }
+
+    meta.global.exportEventsToIgnore = new Set(
+        meta.config.exportEventsToIgnore
+            ? meta.config.exportEventsToIgnore.split(',').map((event) => event.trim())
+            : null
+    )
 
     const credentials = JSON.parse(attachments.googleCloudKeyJson.contents.toString())
     global.bigQueryClient = new BigQuery({
@@ -123,10 +120,14 @@ export const setupPlugin: BigQueryPlugin['setupPlugin'] = async (meta) => {
         }
     }
 
-    setupBufferExportCode(meta, exportEventsToBigQuery)
 }
 
-export async function exportEventsToBigQuery(events: PluginEvent[], { global, config }: PluginMeta<BigQueryPlugin>) {
+
+export const exportEvents: BigQueryPlugin['exportEvents'] = (events, { global, config }) => {
+    if (global.exportEventsToIgnore.has(event.event)) {
+        return
+    }
+
     const insertOptions = {
         createInsertId: false,
         partialRetries: 0,
@@ -204,76 +205,5 @@ export async function exportEventsToBigQuery(events: PluginEvent[], { global, co
             error
         )
         throw new RetryError(`Error inserting into BigQuery! ${JSON.stringify(error.errors)}`)
-    }
-}
-
-// What follows is code that should be abstracted away into the plugin server itself.
-
-const setupBufferExportCode = (
-    meta: PluginMeta<BigQueryPlugin>,
-    exportEvents: (events: PluginEvent[], meta: PluginMeta<BigQueryPlugin>) => Promise<void>
-) => {
-    const uploadBytes = Math.max(
-        1024 * 1024,
-        Math.min(parseInt(meta.config.exportEventsBufferBytes) || 1024 * 1024, 1024 * 1024 * 10)
-    )
-    const uploadSeconds = Math.max(1, Math.min(parseInt(meta.config.exportEventsBufferSeconds) || 30, 600))
-
-    meta.global.exportEventsToIgnore = new Set(
-        meta.config.exportEventsToIgnore
-            ? meta.config.exportEventsToIgnore.split(',').map((event) => event.trim())
-            : null
-    )
-    meta.global.exportEventsBuffer = createBuffer({
-        limit: uploadBytes,
-        timeoutSeconds: uploadSeconds,
-        onFlush: async (batch) => {
-            const jobPayload = {
-                batch,
-                batchId: Math.floor(Math.random() * 1000000),
-                retriesPerformedSoFar: 0,
-            }
-            const firstThroughQueue = false // TODO: might make sense sometimes? e.g. when we are processing too many tasks already?
-            if (firstThroughQueue) {
-                await meta.jobs.exportEventsWithRetry(jobPayload).runNow()
-            } else {
-                await meta.global.exportEventsWithRetry(jobPayload, meta)
-            }
-        },
-    })
-    meta.global.exportEventsWithRetry = async (payload: UploadJobPayload, meta: PluginMeta<BigQueryPlugin>) => {
-        const { jobs } = meta
-        try {
-            await exportEvents(payload.batch, meta)
-        } catch (err) {
-            if (err instanceof RetryError) {
-                if (payload.retriesPerformedSoFar < 15) {
-                    const nextRetrySeconds = 2 ** payload.retriesPerformedSoFar * 3
-                    console.log(`Enqueued batch ${payload.batchId} for retry in ${Math.round(nextRetrySeconds)}s`)
-
-                    await jobs
-                        .exportEventsWithRetry({ ...payload, retriesPerformedSoFar: payload.retriesPerformedSoFar + 1 })
-                        .runIn(nextRetrySeconds, 'seconds')
-                } else {
-                    console.log(
-                        `Dropped batch ${payload.batchId} after retrying ${payload.retriesPerformedSoFar} times`
-                    )
-                }
-            } else {
-                throw err
-            }
-        }
-    }
-}
-
-export const jobs: BigQueryPlugin['jobs'] = {
-    exportEventsWithRetry: async (payload, meta) => {
-        await meta.global.exportEventsWithRetry(payload, meta)
-    },
-}
-
-export const onEvent: BigQueryPlugin['onEvent'] = (event, { global }) => {
-    if (!global.exportEventsToIgnore.has(event.event)) {
-        global.exportEventsBuffer.add(event, JSON.stringify(event).length)
     }
 }

@@ -34,20 +34,6 @@
             "hint": "Comma separated list of events to ignore"
         },
         {
-            "key": "exportEventsBufferBytes",
-            "name": "Maximum upload size in bytes",
-            "type": "string",
-            "default": "1048576",
-            "hint": "Default 1MB. Upload events after buffering this many of them. The value must be between 1 MB and 10 MB."
-        },
-        {
-            "key": "exportEventsBufferSeconds",
-            "name": "Export events at least every X seconds",
-            "type": "string",
-            "default": "30",
-            "hint": "Default 30 seconds. If there are events to upload and this many seconds has passed since the last upload, then upload the queued events. The value must be between 1 and 600 seconds."
-        },
-        {
             "key": "exportElementsOnAnyEvent",
             "name": "Export the property $elements on events that aren't called `$autocapture`?",
             "type": "choice",
