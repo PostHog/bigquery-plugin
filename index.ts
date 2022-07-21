@@ -155,7 +155,6 @@ export async function exportEventsToBigQuery(events: PluginEvent[], { global, co
             const ip = properties?.['$ip'] || event.ip
             const timestamp = event.timestamp || properties?.timestamp || now || sent_at
             let ingestedProperties = properties
-            let elements = []
 
             const shouldExportElementsForEvent =
                 eventName === '$autocapture' || config.exportElementsOnAnyEvent === 'Yes'
