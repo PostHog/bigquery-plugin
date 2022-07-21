@@ -149,6 +149,7 @@ export async function exportEventsToBigQuery(events: PluginEvent[], { global, co
                 now,
                 sent_at,
                 uuid,
+                elements
                 ..._discard
             } = event
             const ip = properties?.['$ip'] || event.ip
@@ -158,24 +159,14 @@ export async function exportEventsToBigQuery(events: PluginEvent[], { global, co
 
             const shouldExportElementsForEvent =
                 eventName === '$autocapture' || config.exportElementsOnAnyEvent === 'Yes'
-
-            if (
-                shouldExportElementsForEvent &&
-                properties &&
-                '$elements' in properties &&
-                Array.isArray(properties['$elements'])
-            ) {
-                const { $elements, ...props } = properties
-                ingestedProperties = props
-                elements = $elements
-            }
+ 
 
             const object: { json: Record<string, any>; insertId?: string } = {
                 json: {
                     uuid,
                     event: eventName,
                     properties: JSON.stringify(ingestedProperties || {}),
-                    elements: JSON.stringify(elements || {}),
+                    elements: JSON.stringify(shouldExportElementsForEvent && elements ? elements : {}),
                     set: JSON.stringify($set || {}),
                     set_once: JSON.stringify($set_once || {}),
                     distinct_id,
