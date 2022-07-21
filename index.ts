@@ -149,7 +149,7 @@ export async function exportEventsToBigQuery(events: PluginEvent[], { global, co
                 now,
                 sent_at,
                 uuid,
-                elements
+                elements,
                 ..._discard
             } = event
             const ip = properties?.['$ip'] || event.ip
