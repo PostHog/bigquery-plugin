@@ -48,3 +48,40 @@ That's it! Once you've done the steps above, your data should start flowing from
 There's a very rare case when duplicate events appear in BigQuery. This happens due to network errors, where the export seems to have failed, yet it actually reaches BigQuery.
 
 While this shouldn't happen, if you find duplicate events in BigQuery, follow these [Google Cloud docs](https://cloud.google.com/bigquery/streaming-data-into-bigquery#manually_removing_duplicates) to manually remove the them.
+
+Here is an example query based on the [Google Cloud docs](https://cloud.google.com/bigquery/streaming-data-into-bigquery#manually_removing_duplicates) that would remove duplicates: 
+
+```sql
+
+WITH
+
+-- first add a row number, one for each uuid
+raw_data AS
+(
+SELECT 
+  *,
+  ROW_NUMBER() OVER (PARTITION BY uuid) as ROW_NUMBER
+from
+  `<project_id>.<dataset>.<table>`
+WHERE
+  DATE(timestamp) = '<YYYY-MM-DD>'
+),
+
+-- now just filter for one row per uuid
+raw_data_deduplicated AS 
+(
+SELECT
+  * EXCEPT(ROW_NUMBER)
+FROM
+  raw_data   
+WHERE
+  ROW_NUMBER = 1
+)
+
+SELECT 
+  * 
+FROM
+  raw_data_deduplicated
+;
+
+```
