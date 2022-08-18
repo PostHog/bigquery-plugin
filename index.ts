@@ -146,32 +146,23 @@ export const exportEvents: BigQueryPlugin['exportEvents'] = async (events, { glo
                 team_id,
                 uuid,
                 timestamp,
+                elements,
                 ..._discard
             } = event
             const ip = properties?.['$ip'] || event.ip
             let ingestedProperties = properties
-            let elements = []
 
             const shouldExportElementsForEvent =
                 eventName === '$autocapture' || config.exportElementsOnAnyEvent === 'Yes'
 
-            if (
-                shouldExportElementsForEvent &&
-                properties &&
-                '$elements' in properties &&
-                Array.isArray(properties['$elements'])
-            ) {
-                const { $elements, ...props } = properties
-                ingestedProperties = props
-                elements = $elements
-            }
 
+            const elementsToExport = shouldExportElementsForEvent ? elements : []
             const object: { json: Record<string, any>; insertId?: string } = {
                 json: {
                     uuid,
                     event: eventName,
                     properties: JSON.stringify(ingestedProperties || {}),
-                    elements: JSON.stringify(elements || {}),
+                    elements: JSON.stringify(elementsToExport),
                     set: JSON.stringify($set || {}),
                     set_once: JSON.stringify($set_once || {}),
                     distinct_id,
@@ -188,15 +179,18 @@ export const exportEvents: BigQueryPlugin['exportEvents'] = async (events, { glo
 
 
 
-        const start = Date.now()
-        await global.bigQueryTable.insert(rows, insertOptions)
-        const end = Date.now() - start
+        if (rows.length > 0) {
+            const start = Date.now()
+            await global.bigQueryTable.insert(rows, insertOptions)
+            const end = Date.now() - start
+    
+            console.log(
+                `Inserted ${events.length} ${events.length > 1 ? 'events' : 'event'} to BigQuery. Took ${
+                    end / 1000
+                } seconds.`
+            )
+        }
 
-        console.log(
-            `Inserted ${events.length} ${events.length > 1 ? 'events' : 'event'} to BigQuery. Took ${
-                end / 1000
-            } seconds.`
-        )
     } catch (error) {
         console.error(
             `Error inserting ${events.length} ${events.length > 1 ? 'events' : 'event'} into BigQuery: `,

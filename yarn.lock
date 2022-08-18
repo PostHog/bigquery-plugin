@@ -604,10 +604,10 @@
   resolved "https://registry.yarnpkg.com/@posthog/plugin-contrib/-/plugin-contrib-0.0.4.tgz#519bf98fe60f8b2fe71e5423141c1bdaa7473cc3"
   integrity sha512-okPx2mIpbpiGMgWq3j9bC6u236rPFpdnSuBzWvWbmE4V9k6vSIZ4/S5w6YFnfa9o/IaudR4LVQ9h7fzXBsV5Fw==
 
-"@posthog/plugin-scaffold@^1.3.3":
-  version "1.3.3"
-  resolved "https://registry.yarnpkg.com/@posthog/plugin-scaffold/-/plugin-scaffold-1.3.3.tgz#5ffa8b6e45e5a5d3e5873f707774152c64fcaf1e"
-  integrity sha512-IKruAaUcb7yXBRWhLTOow+BkvjLjmaB5mFwmTFNUBzphWL0wuAUuhk+gK8nNUZHT72AROK/wdEoA7OAlwQugmQ==
+"@posthog/plugin-scaffold@1.3.4":
+  version "1.3.4"
+  resolved "https://registry.yarnpkg.com/@posthog/plugin-scaffold/-/plugin-scaffold-1.3.4.tgz#56a36f55c8709b89968501c15dd9f3cb216af6c7"
+  integrity sha512-69AC7GA3sU/z5X6SVlH7mgj+0XgolvOp9IUtvRNA4CXF/OglFM81SXbTkURxL9VBSNfdAZxRp+8x+h4rmyj4dw==
   dependencies:
     "@maxmind/geoip2-node" "^3.4.0"
 
