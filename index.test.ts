@@ -1,14 +1,26 @@
-import { exportEvents } from './index'
+import { BIG_QUERY_TABLE_FIELDS, exportEvents, setupPlugin } from './index'
+
+const mockedBigQueryTable = {
+    insert: jest.fn(),
+    getMetadata: jest.fn(() => [{ schema: { fields: []} }]),
+    setMetadata: jest.fn(() => [])
+}
+
+const mockedDataset = {
+    table: () => mockedBigQueryTable,
+    createTable: jest.fn()
+}
+
+jest.mock('@google-cloud/bigquery', () => ({
+    BigQuery: jest.fn(() => ({
+        dataset: () => mockedDataset
+    }))
+}))
 
 describe('BigQuery Export Plugin', () => {
-    let bigQueryTable: Record<string, any>
     let meta: Record<string, any>
 
     beforeEach(() => {
-        bigQueryTable = {
-            insert: jest.fn(),
-            getMetadata: jest.fn(),
-        }
         meta = {
             config: {
                 exportElementsOnAnyEvent: 'No',
@@ -17,14 +29,35 @@ describe('BigQuery Export Plugin', () => {
             },
             attachments: {
                 googleCloudKeyJson: {
-                    contents: { foo: 'some secret stuff' },
+                    contents: `{ "foo": "some secret stuff" }`,
                 },
             },
             global: {
-                bigQueryTable,
+                bigQueryTable: mockedBigQueryTable,
                 exportEventsToIgnore: new Set(['ignore me']),
             },
         }
+        jest.clearAllMocks()
+    })
+
+    describe('setupPlugin()', () => {
+        test('creates table if error thrown when getting metadata on a non-existent table', () => {
+            setupPlugin?.(meta as any)
+            expect(mockedDataset.createTable).not.toHaveBeenCalled()
+
+            mockedBigQueryTable.getMetadata.mockImplementationOnce(() => {throw new Error('Not found')})
+            setupPlugin?.(meta as any)
+            expect(mockedDataset.createTable).toHaveBeenCalled()
+        })
+
+        test('does no table updates if all fields already exist', () => {
+            mockedBigQueryTable.getMetadata.mockImplementationOnce(() => [{ schema: { fields: BIG_QUERY_TABLE_FIELDS as any } }])
+
+            setupPlugin?.(meta as any)
+            expect(mockedBigQueryTable.setMetadata).not.toHaveBeenCalled()
+            expect(mockedDataset.createTable).not.toHaveBeenCalled()
+        })
+
     })
 
     describe('exportEvents()', () => {

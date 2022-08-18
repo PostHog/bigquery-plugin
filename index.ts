@@ -5,7 +5,6 @@ type BigQueryPlugin = Plugin<{
     global: {
         bigQueryClient: BigQuery
         bigQueryTable: Table
-        bigQueryTableFields: TableField[]
         exportEventsToIgnore: Set<string>
     }
     config: {
@@ -15,6 +14,21 @@ type BigQueryPlugin = Plugin<{
         exportElementsOnAnyEvent: 'Yes' | 'No'
     }
 }>
+
+export const BIG_QUERY_TABLE_FIELDS: TableField[] = [
+    { name: 'uuid', type: 'STRING' },
+    { name: 'event', type: 'STRING' },
+    { name: 'properties', type: 'STRING' },
+    { name: 'elements', type: 'STRING' },
+    { name: 'set', type: 'STRING' },
+    { name: 'set_once', type: 'STRING' },
+    { name: 'distinct_id', type: 'STRING' },
+    { name: 'team_id', type: 'INT64' },
+    { name: 'ip', type: 'STRING' },
+    { name: 'site_url', type: 'STRING' },
+    { name: 'timestamp', type: 'TIMESTAMP' },
+    { name: 'bq_ingested_timestamp', type: 'TIMESTAMP' },
+]
 
 
 export const setupPlugin: BigQueryPlugin['setupPlugin'] = async (meta) => {
@@ -44,21 +58,6 @@ export const setupPlugin: BigQueryPlugin['setupPlugin'] = async (meta) => {
 
     global.bigQueryTable = global.bigQueryClient.dataset(config.datasetId).table(config.tableId)
 
-    global.bigQueryTableFields = [
-        { name: 'uuid', type: 'STRING' },
-        { name: 'event', type: 'STRING' },
-        { name: 'properties', type: 'STRING' },
-        { name: 'elements', type: 'STRING' },
-        { name: 'set', type: 'STRING' },
-        { name: 'set_once', type: 'STRING' },
-        { name: 'distinct_id', type: 'STRING' },
-        { name: 'team_id', type: 'INT64' },
-        { name: 'ip', type: 'STRING' },
-        { name: 'site_url', type: 'STRING' },
-        { name: 'timestamp', type: 'TIMESTAMP' },
-        { name: 'bq_ingested_timestamp', type: 'TIMESTAMP' },
-    ]
-
     try {
         const [metadata]: TableMetadata[] = await global.bigQueryTable.getMetadata()
 
@@ -67,7 +66,7 @@ export const setupPlugin: BigQueryPlugin['setupPlugin'] = async (meta) => {
         }
 
         const existingFields = metadata.schema.fields
-        const fieldsToAdd = global.bigQueryTableFields.filter(
+        const fieldsToAdd = BIG_QUERY_TABLE_FIELDS.filter(
             ({ name }) => !existingFields.find((f: any) => f.name === name)
         )
 
@@ -83,7 +82,7 @@ export const setupPlugin: BigQueryPlugin['setupPlugin'] = async (meta) => {
                 metadata.schema.fields = metadata.schema.fields.concat(fieldsToAdd)
                 ;[result] = await global.bigQueryTable.setMetadata(metadata)
             } catch (error) {
-                const fieldsToStillAdd = global.bigQueryTableFields.filter(
+                const fieldsToStillAdd = BIG_QUERY_TABLE_FIELDS.filter(
                     ({ name }) => !result.schema?.fields?.find((f: any) => f.name === name)
                 )
 
@@ -106,7 +105,7 @@ export const setupPlugin: BigQueryPlugin['setupPlugin'] = async (meta) => {
         try {
             await global.bigQueryClient
                 .dataset(config.datasetId)
-                .createTable(config.tableId, { schema: global.bigQueryTableFields })
+                .createTable(config.tableId, { schema: BIG_QUERY_TABLE_FIELDS })
         } catch (error) {
             // a different worker already created the table
             if (!(error as Error).message.includes('Already Exists')) {
