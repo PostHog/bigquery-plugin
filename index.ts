@@ -1,5 +1,5 @@
 import { createBuffer } from '@posthog/plugin-contrib'
-import { Plugin, PluginMeta, PluginEvent, RetryError } from '@posthog/plugin-scaffold'
+import { Plugin, PluginMeta, ProcessedPluginEvent, RetryError } from '@posthog/plugin-scaffold'
 import { BigQuery, Table, TableField, TableMetadata } from '@google-cloud/bigquery'
 
 type BigQueryPlugin = Plugin<{
@@ -27,7 +27,7 @@ type BigQueryPlugin = Plugin<{
 }>
 
 interface UploadJobPayload {
-    batch: PluginEvent[]
+    batch: ProcessedPluginEvent[]
     batchId: number
     retriesPerformedSoFar: number
 }
@@ -106,8 +106,8 @@ export const setupPlugin: BigQueryPlugin['setupPlugin'] = async (meta) => {
         }
     } catch (error) {
         // some other error? abort!
-        if (!error.message.includes('Not found')) {
-            throw new Error(error)
+        if (!(error as Error).message.includes('Not found')) {
+            throw error
         }
         console.log(`Creating BigQuery Table - ${config.datasetId}:${config.tableId}`)
 
@@ -117,7 +117,7 @@ export const setupPlugin: BigQueryPlugin['setupPlugin'] = async (meta) => {
                 .createTable(config.tableId, { schema: global.bigQueryTableFields })
         } catch (error) {
             // a different worker already created the table
-            if (!error.message.includes('Already Exists')) {
+            if (!(error as Error).message.includes('Already Exists')) {
                 throw error
             }
         }
@@ -126,7 +126,7 @@ export const setupPlugin: BigQueryPlugin['setupPlugin'] = async (meta) => {
     setupBufferExportCode(meta, exportEventsToBigQuery)
 }
 
-export async function exportEventsToBigQuery(events: PluginEvent[], { global, config }: PluginMeta<BigQueryPlugin>) {
+export async function exportEventsToBigQuery(events: ProcessedPluginEvent[], { global, config }: PluginMeta<BigQueryPlugin>) {
     const insertOptions = {
         createInsertId: false,
         partialRetries: 0,
@@ -145,15 +145,12 @@ export async function exportEventsToBigQuery(events: PluginEvent[], { global, co
                 $set_once,
                 distinct_id,
                 team_id,
-                site_url,
-                now,
-                sent_at,
                 uuid,
                 elements,
                 ..._discard
             } = event
             const ip = properties?.['$ip'] || event.ip
-            const timestamp = event.timestamp || properties?.timestamp || now || sent_at
+            const timestamp = event.timestamp || properties?.timestamp
             let ingestedProperties = properties
 
             const shouldExportElementsForEvent =
@@ -171,7 +168,6 @@ export async function exportEventsToBigQuery(events: PluginEvent[], { global, co
                     distinct_id,
                     team_id,
                     ip,
-                    site_url,
                     timestamp: timestamp,
                     bq_ingested_timestamp: new Date().toISOString(),
                 },
@@ -193,7 +189,7 @@ export async function exportEventsToBigQuery(events: PluginEvent[], { global, co
             `Error inserting ${events.length} ${events.length > 1 ? 'events' : 'event'} into BigQuery: `,
             error
         )
-        throw new RetryError(`Error inserting into BigQuery! ${JSON.stringify(error.errors)}`)
+        throw new RetryError(`Error inserting into BigQuery! ${(error as Error).message}`)
     }
 }
 
@@ -201,7 +197,7 @@ export async function exportEventsToBigQuery(events: PluginEvent[], { global, co
 
 const setupBufferExportCode = (
     meta: PluginMeta<BigQueryPlugin>,
-    exportEvents: (events: PluginEvent[], meta: PluginMeta<BigQueryPlugin>) => Promise<void>
+    exportEvents: (events: ProcessedPluginEvent[], meta: PluginMeta<BigQueryPlugin>) => Promise<void>
 ) => {
     const uploadBytes = Math.max(
         1024 * 1024,
