@@ -58,9 +58,10 @@ export const setupPlugin: BigQueryPlugin['setupPlugin'] = async (meta) => {
 
     global.bigQueryTable = global.bigQueryClient.dataset(config.datasetId).table(config.tableId)
 
-    const existingFields = await meta.cache.get('bigQueryTableFieldsSynced', 0)
+    // Note: When changing table schema in incompatible ways remember to cache-bust this.
+    const cachedMetadata = await meta.cache.get('cachedMetadata', null) as any | null
 
-    if (existingFields === BIG_QUERY_TABLE_FIELDS.length) {
+    if (cachedMetadata?.datasetId === config.datasetId && cachedMetadata?.tableId === config.tableId && cachedMetadata?.existingFields === BIG_QUERY_TABLE_FIELDS.length) {
         return
     }
 
@@ -120,7 +121,11 @@ export const setupPlugin: BigQueryPlugin['setupPlugin'] = async (meta) => {
         }
     }
 
-    await meta.cache.set('bigQueryTableFieldsSynced', BIG_QUERY_TABLE_FIELDS.length)
+    await meta.cache.set('cachedMetadata', {
+        tableId: config.tableId,
+        datasetId: config.datasetId,
+        existingFields: BIG_QUERY_TABLE_FIELDS.length
+    })
 }
 
 

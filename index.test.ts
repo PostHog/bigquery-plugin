@@ -56,23 +56,55 @@ describe('BigQuery Export Plugin', () => {
 
         test('does no table updates if all fields already exist but not in cache', async () => {
             mockedBigQueryTable.getMetadata.mockReturnValue([{ schema: { fields: BIG_QUERY_TABLE_FIELDS as any } }])
-            meta.cache.get.mockResolvedValue(BIG_QUERY_TABLE_FIELDS.length-3)
+            meta.cache.get.mockResolvedValue({
+                datasetId: "1234",
+                tableId: "1234",
+                existingFields: BIG_QUERY_TABLE_FIELDS.length-3
+            })
 
             await setupPlugin?.(meta as any)
             expect(mockedBigQueryTable.getMetadata).toHaveBeenCalled()
             expect(mockedBigQueryTable.setMetadata).not.toHaveBeenCalled()
             expect(mockedDataset.createTable).not.toHaveBeenCalled()
-            expect(meta.cache.set).toHaveBeenCalledWith('bigQueryTableFieldsSynced', BIG_QUERY_TABLE_FIELDS.length)
+            expect(meta.cache.set).toHaveBeenCalledWith('cachedMetadata', {
+                datasetId: "1234",
+                tableId: "1234",
+                existingFields: BIG_QUERY_TABLE_FIELDS.length
+            })
         })
 
         it('does not call getMetadata if already in sync according to cache', async () => {
-            meta.cache.get.mockResolvedValue(BIG_QUERY_TABLE_FIELDS.length)
+            meta.cache.get.mockResolvedValue({
+                datasetId: "1234",
+                tableId: "1234",
+                existingFields: BIG_QUERY_TABLE_FIELDS.length
+            })
 
             await setupPlugin?.(meta as any)
             expect(mockedBigQueryTable.getMetadata).not.toHaveBeenCalled()
             expect(mockedBigQueryTable.setMetadata).not.toHaveBeenCalled()
             expect(mockedDataset.createTable).not.toHaveBeenCalled()
             expect(meta.cache.set).not.toHaveBeenCalled()
+        })
+
+        it('updates tables if config has changed', async () => {
+            mockedBigQueryTable.getMetadata.mockReturnValue([{ schema: { fields: [] as any } }])
+            meta.cache.get.mockResolvedValue({
+                datasetId: "wrong",
+                tableId: "1234",
+                existingFields: BIG_QUERY_TABLE_FIELDS.length
+            })
+
+            await setupPlugin?.(meta as any)
+            expect(mockedBigQueryTable.getMetadata).toHaveBeenCalled()
+            expect(mockedBigQueryTable.setMetadata).toHaveBeenCalled()
+            expect(mockedDataset.createTable).not.toHaveBeenCalled()
+            expect(meta.cache.set).toHaveBeenCalledWith('cachedMetadata', {
+                datasetId: "1234",
+                tableId: "1234",
+                existingFields: BIG_QUERY_TABLE_FIELDS.length
+            })
+
         })
     })
 
