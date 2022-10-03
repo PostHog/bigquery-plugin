@@ -22,6 +22,10 @@ describe('BigQuery Export Plugin', () => {
 
     beforeEach(() => {
         meta = {
+            cache: {
+                get: jest.fn(),
+                set: jest.fn()
+            },
             config: {
                 exportElementsOnAnyEvent: 'No',
                 datasetId: '1234',
@@ -41,23 +45,35 @@ describe('BigQuery Export Plugin', () => {
     })
 
     describe('setupPlugin()', () => {
-        test('creates table if error thrown when getting metadata on a non-existent table', () => {
-            setupPlugin?.(meta as any)
+        test('creates table if error thrown when getting metadata on a non-existent table', async () => {
+            await setupPlugin?.(meta as any)
             expect(mockedDataset.createTable).not.toHaveBeenCalled()
 
             mockedBigQueryTable.getMetadata.mockImplementationOnce(() => {throw new Error('Not found')})
-            setupPlugin?.(meta as any)
+            await setupPlugin?.(meta as any)
             expect(mockedDataset.createTable).toHaveBeenCalled()
         })
 
-        test('does no table updates if all fields already exist', () => {
-            mockedBigQueryTable.getMetadata.mockImplementationOnce(() => [{ schema: { fields: BIG_QUERY_TABLE_FIELDS as any } }])
+        test('does no table updates if all fields already exist but not in cache', async () => {
+            mockedBigQueryTable.getMetadata.mockReturnValue([{ schema: { fields: BIG_QUERY_TABLE_FIELDS as any } }])
+            meta.cache.get.mockResolvedValue(BIG_QUERY_TABLE_FIELDS.length-3)
 
-            setupPlugin?.(meta as any)
+            await setupPlugin?.(meta as any)
+            expect(mockedBigQueryTable.getMetadata).toHaveBeenCalled()
             expect(mockedBigQueryTable.setMetadata).not.toHaveBeenCalled()
             expect(mockedDataset.createTable).not.toHaveBeenCalled()
+            expect(meta.cache.set).toHaveBeenCalledWith('bigQueryTableFieldsSynced', BIG_QUERY_TABLE_FIELDS.length)
         })
 
+        it('does not call getMetadata if already in sync according to cache', async () => {
+            meta.cache.get.mockResolvedValue(BIG_QUERY_TABLE_FIELDS.length)
+
+            await setupPlugin?.(meta as any)
+            expect(mockedBigQueryTable.getMetadata).not.toHaveBeenCalled()
+            expect(mockedBigQueryTable.setMetadata).not.toHaveBeenCalled()
+            expect(mockedDataset.createTable).not.toHaveBeenCalled()
+            expect(meta.cache.set).not.toHaveBeenCalled()
+        })
     })
 
     describe('exportEvents()', () => {

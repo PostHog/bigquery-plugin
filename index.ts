@@ -58,6 +58,12 @@ export const setupPlugin: BigQueryPlugin['setupPlugin'] = async (meta) => {
 
     global.bigQueryTable = global.bigQueryClient.dataset(config.datasetId).table(config.tableId)
 
+    const existingFields = await meta.cache.get('bigQueryTableFieldsSynced', 0)
+
+    if (existingFields === BIG_QUERY_TABLE_FIELDS.length) {
+        return
+    }
+
     try {
         const [metadata]: TableMetadata[] = await global.bigQueryTable.getMetadata()
 
@@ -114,6 +120,7 @@ export const setupPlugin: BigQueryPlugin['setupPlugin'] = async (meta) => {
         }
     }
 
+    await meta.cache.set('bigQueryTableFieldsSynced', BIG_QUERY_TABLE_FIELDS.length)
 }
 
 
