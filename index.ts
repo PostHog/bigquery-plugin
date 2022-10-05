@@ -173,9 +173,10 @@ async function updateBigQueryTableSchema(meta: any, metadata: TableMetadata) {
                 }
             }
         } catch (error) {
-            console.log("Updating table schema failed:", error)
+            console.error("Updating table schema failed:", error)
             throw error
         }
+        // Always refresh the cache
         await meta.cache.set('cachedMetadata', {
             tableId: config.tableId,
             datasetId: config.datasetId,
