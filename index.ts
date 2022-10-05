@@ -107,31 +107,6 @@ export const setupPlugin: BigQueryPlugin['setupPlugin'] = async (meta) => {
     }
 }
 
-async function createBigQueryTable(meta: any) {
-    const { global, config } = meta
-
-    console.log(`Creating BigQuery Table - ${config.datasetId}:${config.tableId}`)
-
-    try {
-        await global.bigQueryClient
-            .dataset(config.datasetId)
-            .createTable(config.tableId, { schema: BIG_QUERY_TABLE_FIELDS })
-            
-        await meta.cache.set('cachedMetadata', {
-            tableId: config.tableId,
-            datasetId: config.datasetId,
-            existingFields: BIG_QUERY_TABLE_FIELDS.length
-        })
-    } catch (error) {
-        // a different worker already created the table
-        if (!(error as Error).message.includes('Already Exists')) {
-            throw new RetryError(`Another thread aleady created the table, retrying setup (${(error as Error).message})`)
-        }
-        console.error('Creating BigQuery Table failed:', error)
-        throw error
-    }
-}
-
 async function updateBigQueryTableSchema(meta: any, metadata: TableMetadata) {
         const { global, config } = meta
 
@@ -184,6 +159,30 @@ async function updateBigQueryTableSchema(meta: any, metadata: TableMetadata) {
         })
 }
 
+async function createBigQueryTable(meta: any) {
+    const { global, config } = meta
+
+    console.log(`Creating BigQuery Table - ${config.datasetId}:${config.tableId}`)
+
+    try {
+        await global.bigQueryClient
+            .dataset(config.datasetId)
+            .createTable(config.tableId, { schema: BIG_QUERY_TABLE_FIELDS })
+
+        await meta.cache.set('cachedMetadata', {
+            tableId: config.tableId,
+            datasetId: config.datasetId,
+            existingFields: BIG_QUERY_TABLE_FIELDS.length
+        })
+    } catch (error) {
+        // a different worker already created the table
+        if (!(error as Error).message.includes('Already Exists')) {
+            throw new RetryError(`Another thread aleady created the table, retrying setup (${(error as Error).message})`)
+        }
+        console.error('Creating BigQuery Table failed:', error)
+        throw error
+    }
+}
 
 
 export const exportEvents: BigQueryPlugin['exportEvents'] = async (events, { global, config }) => {
