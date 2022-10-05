@@ -1,4 +1,6 @@
 import { BIG_QUERY_TABLE_FIELDS, exportEvents, setupPlugin } from './index'
+import { FetchError } from 'node-fetch'
+import { RetryError } from '@posthog/plugin-scaffold'
 
 const mockedBigQueryTable = {
     insert: jest.fn(),
@@ -108,16 +110,17 @@ describe('BigQuery Export Plugin', () => {
         })
 
         it('throws retryError on socket errors', async () => {
-            mockedBigQueryTable.getMetadata.mockReturnValue([{ schema: { fields: [] as any } }])
+            mockedBigQueryTable.getMetadata.mockImplementation(() => {
+                throw new FetchError("Client network socket disconnected before secure TLS connection was established", 'system');
+              });
             meta.cache.get.mockResolvedValue({
                 datasetId: "wrong",
                 tableId: "1234",
                 existingFields: BIG_QUERY_TABLE_FIELDS.length
             })
 
-            // TODO: cause google lib oauth token request to throw "socket hand
-            // up" Error.
-            expect(async () => await setupPlugin?.(meta as any)).toThrow("retryError")
+            expect(async () => await setupPlugin?.(meta as any)).rejects.toThrow(RetryError)
+
         })
     })
 

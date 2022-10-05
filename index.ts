@@ -68,13 +68,77 @@ export const setupPlugin: BigQueryPlugin['setupPlugin'] = async (meta) => {
             return
         }
 
+        let metadata: TableMetadata
         try {
-            const [metadata]: TableMetadata[] = await global.bigQueryTable.getMetadata()
-
-            if (!metadata.schema || !metadata.schema.fields) {
-                throw new Error('Can not get metadata for table. Please check if the table schema is defined.')
+            [metadata] = await global.bigQueryTable.getMetadata()
+        } catch (error) {
+            console.error("Failed to get metadata:", error)
+            // some other error? abort!
+            if (!(error as Error).message.includes('Not found')) {
+                throw error
             }
+            createBigQueryTable(meta)
+            return // if we just created the table, we don't need to verify nor update the schema
+        }
 
+        updateBigQueryTableSchema(meta, metadata)
+
+    } catch (error) {
+        if(error instanceof Error) {
+            console.error('Error encountered in setupPlugin:', error.stack)
+        } else {
+            console.error('Error encountered in setupPlugin:', error)
+        }
+
+        if (error instanceof FetchError) {
+            // If we get an operational fetch error then indicate that
+            // setupPlugin should be retried by raising a retryError. node-fetch
+            // (which the Google auth lib uses) raises a FetchError for
+            // "operational" errors e.g. failed sockets.
+            //
+            // See
+            // https://github.com/node-fetch/node-fetch/blob/main/docs/ERROR-HANDLING.md
+            // for details.
+            throw new RetryError(`Operational fetch error encountered: ${(error as Error).message}`)
+        } else {
+            // Otherwise we just throw and let the caller decide what to do.
+            throw error
+        }
+    }
+}
+
+async function createBigQueryTable(meta: any) {
+    const { global, config } = meta
+
+    console.log(`Creating BigQuery Table - ${config.datasetId}:${config.tableId}`)
+
+    try {
+        await global.bigQueryClient
+            .dataset(config.datasetId)
+            .createTable(config.tableId, { schema: BIG_QUERY_TABLE_FIELDS })
+            
+        await meta.cache.set('cachedMetadata', {
+            tableId: config.tableId,
+            datasetId: config.datasetId,
+            existingFields: BIG_QUERY_TABLE_FIELDS.length
+        })
+    } catch (error) {
+        // a different worker already created the table
+        if (!(error as Error).message.includes('Already Exists')) {
+            throw new RetryError(`Another thread aleady created the table, retrying setup (${(error as Error).message})`)
+        }
+        console.error('Creating BigQuery Table failed:', error)
+        throw error
+    }
+}
+
+async function updateBigQueryTableSchema(meta: any, metadata: TableMetadata) {
+        const { global, config } = meta
+
+        if (!metadata.schema || !metadata.schema.fields) {
+            throw new Error('Can not get metadata for table. Please check if the table schema is defined.')
+        }
+        try {
             const existingFields = metadata.schema.fields
             const fieldsToAdd = BIG_QUERY_TABLE_FIELDS.filter(
                 ({ name }) => !existingFields.find((f: any) => f.name === name)
@@ -91,74 +155,34 @@ export const setupPlugin: BigQueryPlugin['setupPlugin'] = async (meta) => {
                 try {
                     metadata.schema.fields = metadata.schema.fields.concat(fieldsToAdd)
                         ;[result] = await global.bigQueryTable.setMetadata(metadata)
-                } catch (error) {
-                    if (error instanceof Error) {
-                        console.error(error.stack)
-                    }
-                    else {
-                        console.error(error)
-                    }
 
+                } catch (error) {
+                    console.error("Failed to set Metadata", error)
+
+                    // a different worker already updated the table
                     const fieldsToStillAdd = BIG_QUERY_TABLE_FIELDS.filter(
                         ({ name }) => !result.schema?.fields?.find((f: any) => f.name === name)
                     )
 
                     if (fieldsToStillAdd.length > 0) {
-                        throw new Error(
-                            `Tried adding fields ${JSON.stringify(fieldsToAdd)}, but ${JSON.stringify(
-                                fieldsToStillAdd
-                            )} still to add. Can not start plugin.`
-                        )
+                        console.error(`Tried adding fields ${JSON.stringify(fieldsToAdd)}, but ${JSON.stringify(
+                            fieldsToStillAdd
+                        )} still to add. Can not start plugin.`)
+                        throw error
                     }
                 }
             }
         } catch (error) {
-            // some other error? abort!
-            if (!(error as Error).message.includes('Not found')) {
-                throw error
-            }
-            console.log(`Creating BigQuery Table - ${config.datasetId}:${config.tableId}`)
-
-            try {
-                await global.bigQueryClient
-                    .dataset(config.datasetId)
-                    .createTable(config.tableId, { schema: BIG_QUERY_TABLE_FIELDS })
-            } catch (error) {
-                // a different worker already created the table
-                if (!(error as Error).message.includes('Already Exists')) {
-                    throw error
-                }
-            }
+            console.log("Updating table schema failed:", error)
+            throw error
         }
-
         await meta.cache.set('cachedMetadata', {
             tableId: config.tableId,
             datasetId: config.datasetId,
             existingFields: BIG_QUERY_TABLE_FIELDS.length
         })
-    } catch (error) {
-        if(error instanceof Error) {
-            console.error('Error encountered in setupPlugin:', error.stack)
-        } else {
-            console.error('Error encountered in setupPlugin:', error)
-        }
-        
-        if (error instanceof FetchError) {
-            // If we get an operational fetch error then indicate that
-            // setupPlugin should be retried by raising a retryError. node-fetch
-            // (which the Google auth lib uses) raises a FetchError for
-            // "operational" errors e.g. failed sockets.
-            //
-            // See
-            // https://github.com/node-fetch/node-fetch/blob/main/docs/ERROR-HANDLING.md
-            // for details.
-            throw new RetryError(`Operational fetch error encountered: ${error.stack}`)
-        } else {
-            // Otherwise we just throw and let the caller decide what to do.
-            throw error
-        }
-    }
 }
+
 
 
 export const exportEvents: BigQueryPlugin['exportEvents'] = async (events, { global, config }) => {
