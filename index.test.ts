@@ -106,6 +106,19 @@ describe('BigQuery Export Plugin', () => {
             })
 
         })
+
+        it('throws retryError on socket errors', async () => {
+            mockedBigQueryTable.getMetadata.mockReturnValue([{ schema: { fields: [] as any } }])
+            meta.cache.get.mockResolvedValue({
+                datasetId: "wrong",
+                tableId: "1234",
+                existingFields: BIG_QUERY_TABLE_FIELDS.length
+            })
+
+            // TODO: cause google lib oauth token request to throw "socket hand
+            // up" Error.
+            expect(async () => await setupPlugin?.(meta as any)).toThrow("retryError")
+        })
     })
 
     describe('exportEvents()', () => {
