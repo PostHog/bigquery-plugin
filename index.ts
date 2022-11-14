@@ -185,7 +185,8 @@ async function createBigQueryTable(meta: any) {
 }
 
 
-export const exportEvents: BigQueryPlugin['exportEvents'] = async (events, { global, config }) => {
+export const exportEvents: BigQueryPlugin['exportEvents'] = async (events, meta) => {
+    const { global, config } = meta
     const insertOptions = {
         createInsertId: false,
         partialRetries: 0,
@@ -257,11 +258,25 @@ export const exportEvents: BigQueryPlugin['exportEvents'] = async (events, { glo
             )
         }
 
-    } catch (error) {
+    } catch (error: any) {
         console.error(
             `Error inserting ${events.length} ${events.length > 1 ? 'events' : 'event'} into BigQuery: `,
             error
         )
+        // :TRICKY: If the message is too large for a single request, split it in half and try again
+        if (error?.message?.includes('Request Entity Too Large')) {
+            if (events.length > 1) {
+                const halfLength = Math.floor(events.length / 2)
+                await Promise.all([
+                    exportEvents?.(events.slice(0, halfLength), meta),
+                    exportEvents?.(events.slice(halfLength), meta)
+                ])
+                return
+            } else {
+                throw new Error(`Error inserting into BigQuery! ${error.message}`)
+            }
+        }
+
         throw new RetryError(`Error inserting into BigQuery! ${(error as Error).message}`)
     }
 }

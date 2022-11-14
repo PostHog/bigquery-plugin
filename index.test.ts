@@ -271,36 +271,96 @@ describe('BigQuery Export Plugin', () => {
             )
         })
 
+        describe('error handling', () => {
+            const events = [
+                {
+                    event: 'test',
+                    properties: {},
+                    distinct_id: 'did1',
+                    team_id: 1,
+                    uuid: '37114ebb-7b13-4301-b849-0d0bd4d5c7e5',
+                    ip: '127.0.0.1',
+                    timestamp: '2022-08-18T15:42:32.597Z',
+                },
+                {
+                    event: 'test2',
+                    properties: {},
+                    distinct_id: 'did1',
+                    team_id: 1,
+                    uuid: '37114ebb-7b13-4301-b859-0d0bd4d5c7e5',
+                    ip: '127.0.0.1',
+                    timestamp: '2022-08-18T15:42:32.597Z',
+                    elements: [{ attr_id: 'haha' }],
+                },
+            ]
+            const ENTITY_TOO_LARGE_ERROR = "Multiple errors occurred during the request. Please see the `errors` array for complete details.\n\n 1. Request Entity Too Large\n 2. <!DOCTYPE html>\n<html lang=en>\n <meta charset=utf-8>\n <meta name=viewport content=\"initial-scale=1, minimum-scale=1, width=device-width\">\n <title>Error 413 (Request Entity Too Large)!!1</title>\n <style>\n *{margin:0;padding:0}html,code{font:15px/22px arial,sans-serif}html{background:#fff;color:#222;padding:15px}body{margin:7% auto 0;max-width:390px;min-height:180px;padding:30px 0 15px}* > body{background:url(//www.google.com/images/errors/robot.png) 100% 5px no-repeat;padding-right:205px}p{margin:11px 0 22px;overflow:hidden}ins{color:#777;text-decoration:none}a img{border:0}@media screen and (max-width:772px){body{background:none;margin-top:0;max-width:none;padding-right:0}}#logo{background:url(//www.google.com/images/branding/googlelogo/1x/googlelogo_color_150x54dp.png) no-repeat;margin-left:-5px}@media only scree"
 
-        it('raises a RetryError if insert failed', async () => {
-            mockedBigQueryTable.insert.mockRejectedValue(new Error("Some BigQuery error"))
+            it('raises a RetryError if insert failed', async () => {
+                mockedBigQueryTable.insert.mockRejectedValueOnce(new Error("Some BigQuery error"))
 
-            const promise = exportEvents?.(
-                [
-                    {
-                        event: 'test',
-                        properties: {},
-                        distinct_id: 'did1',
-                        team_id: 1,
-                        uuid: '37114ebb-7b13-4301-b849-0d0bd4d5c7e5',
-                        ip: '127.0.0.1',
-                        timestamp: '2022-08-18T15:42:32.597Z',
-                    },
-                    {
-                        event: 'test2',
-                        properties: {},
-                        distinct_id: 'did1',
-                        team_id: 1,
-                        uuid: '37114ebb-7b13-4301-b859-0d0bd4d5c7e5',
-                        ip: '127.0.0.1',
-                        timestamp: '2022-08-18T15:42:32.597Z',
-                        elements: [{ attr_id: 'haha' }],
-                    },
-                ],
-                meta as any
-            )
+                const promise = exportEvents?.(events, meta as any)
 
-            await expect(promise).rejects.toEqual(new RetryError('Error inserting into BigQuery! Some BigQuery error'))
+                await expect(promise).rejects.toEqual(new RetryError('Error inserting into BigQuery! Some BigQuery error'))
+            })
+
+            it('handles Request Entity Too Large errors', async () => {
+                mockedBigQueryTable.insert.mockRejectedValueOnce(new Error(ENTITY_TOO_LARGE_ERROR))
+
+                await exportEvents?.(events, meta as any)
+
+                expect(mockedBigQueryTable.insert).toHaveBeenCalledTimes(3)
+                expect(meta.global.bigQueryTable.insert.mock.calls[1][0]).toEqual(
+                    [
+                        {
+                            json: {
+                                bq_ingested_timestamp: expect.any(String),
+                                distinct_id: 'did1',
+                                elements: '[]',
+                                event: 'test',
+                                ip: '127.0.0.1',
+                                properties: '{}',
+                                set: '{}',
+                                set_once: '{}',
+                                site_url: '',
+                                team_id: 1,
+                                timestamp: '2022-08-18T15:42:32.597Z',
+                                uuid: '37114ebb-7b13-4301-b849-0d0bd4d5c7e5',
+                            }
+                        }
+                    ]
+                )
+
+                expect(meta.global.bigQueryTable.insert.mock.calls[2][0]).toEqual(
+                    [
+                        {
+                            json: {
+                                bq_ingested_timestamp: expect.any(String),
+                                distinct_id: 'did1',
+                                elements: '[]',
+                                event: 'test2',
+                                ip: '127.0.0.1',
+                                properties: '{}',
+                                set: '{}',
+                                set_once: '{}',
+                                site_url: '',
+                                team_id: 1,
+                                timestamp: '2022-08-18T15:42:32.597Z',
+                                uuid: '37114ebb-7b13-4301-b859-0d0bd4d5c7e5',
+                            }
+                        }
+                    ]
+                )
+            })
+
+            it('stops retrying on Request Entity Too Large when only a single event', async () => {
+                mockedBigQueryTable.insert.mockRejectedValueOnce(
+                    new Error(ENTITY_TOO_LARGE_ERROR)
+                )
+
+                const promise = exportEvents?.([events[0]], meta as any)
+
+                await expect(promise).rejects.toEqual(new Error(`Error inserting into BigQuery! ${ENTITY_TOO_LARGE_ERROR}`))
+            })
         })
     })
 })
