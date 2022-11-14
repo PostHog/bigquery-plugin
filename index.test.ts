@@ -4,7 +4,7 @@ import { RetryError } from '@posthog/plugin-scaffold'
 
 const mockedBigQueryTable = {
     insert: jest.fn(),
-    getMetadata: jest.fn(() => [{ schema: { fields: []} }]),
+    getMetadata: jest.fn().mockResolvedValue([{ schema: { fields: []} }]),
     setMetadata: jest.fn(() => [])
 }
 
@@ -18,6 +18,12 @@ jest.mock('@google-cloud/bigquery', () => ({
         dataset: () => mockedDataset
     }))
 }))
+
+beforeEach(() => {
+    console.log = jest.fn()
+    console.info = jest.fn()
+    console.error = jest.fn()
+})
 
 describe('BigQuery Export Plugin', () => {
     let meta: Record<string, any>
@@ -47,7 +53,7 @@ describe('BigQuery Export Plugin', () => {
     })
 
     describe('setupPlugin()', () => {
-        test('creates table if error thrown when getting metadata on a non-existent table', async () => {
+        it('creates table if error thrown when getting metadata on a non-existent table', async () => {
             await setupPlugin?.(meta as any)
             expect(mockedDataset.createTable).not.toHaveBeenCalled()
 
@@ -56,7 +62,7 @@ describe('BigQuery Export Plugin', () => {
             expect(mockedDataset.createTable).toHaveBeenCalled()
         })
 
-        test('does no table updates if all fields already exist but not in cache', async () => {
+        it('does no table updates if all fields already exist but not in cache', async () => {
             mockedBigQueryTable.getMetadata.mockReturnValue([{ schema: { fields: BIG_QUERY_TABLE_FIELDS as any } }])
             meta.cache.get.mockResolvedValue({
                 datasetId: "1234",
@@ -90,7 +96,7 @@ describe('BigQuery Export Plugin', () => {
         })
 
         it('updates tables if config has changed', async () => {
-            mockedBigQueryTable.getMetadata.mockReturnValue([{ schema: { fields: [] as any } }])
+            mockedBigQueryTable.getMetadata.mockResolvedValue([{ schema: { fields: [] as any } }])
             meta.cache.get.mockResolvedValue({
                 datasetId: "wrong",
                 tableId: "1234",
@@ -110,9 +116,9 @@ describe('BigQuery Export Plugin', () => {
         })
 
         it('throws retryError on socket errors', async () => {
-            mockedBigQueryTable.getMetadata.mockImplementation(() => {
-                throw new FetchError("Client network socket disconnected before secure TLS connection was established", 'system');
-              });
+            mockedBigQueryTable.getMetadata.mockRejectedValue(
+                new FetchError("Client network socket disconnected before secure TLS connection was established", 'system')
+            )
             meta.cache.get.mockResolvedValue({
                 datasetId: "wrong",
                 tableId: "1234",
@@ -125,7 +131,7 @@ describe('BigQuery Export Plugin', () => {
     })
 
     describe('exportEvents()', () => {
-        test('makes the right call to bigQueryTable.insert', async () => {
+        it('makes the right call to bigQueryTable.insert', async () => {
             await exportEvents?.(
                 [
                     {
@@ -194,7 +200,7 @@ describe('BigQuery Export Plugin', () => {
             )
         }),
 
-        test('ignores events in exportEventsToIgnore', async () => {
+        it('ignores events in exportEventsToIgnore', async () => {
             const meta = {
                 config: {
                     exportElementsOnAnyEvent: 'No',
@@ -224,7 +230,7 @@ describe('BigQuery Export Plugin', () => {
             expect(meta.global.bigQueryTable.insert).not.toHaveBeenCalled()
         })
 
-        test('exports elements if exportElementsOnAnyEvent is true', async () => {
+        it('exports elements if exportElementsOnAnyEvent is true', async () => {
             const customMeta = { ...meta, config: { exportElementsOnAnyEvent: 'Yes' } }
             await exportEvents?.(
                 [
@@ -263,6 +269,38 @@ describe('BigQuery Export Plugin', () => {
                 ],
                 { createInsertId: false, partialRetries: 0, raw: true }
             )
+        })
+
+
+        it('raises a RetryError if insert failed', async () => {
+            mockedBigQueryTable.insert.mockRejectedValue(new Error("Some BigQuery error"))
+
+            const promise = exportEvents?.(
+                [
+                    {
+                        event: 'test',
+                        properties: {},
+                        distinct_id: 'did1',
+                        team_id: 1,
+                        uuid: '37114ebb-7b13-4301-b849-0d0bd4d5c7e5',
+                        ip: '127.0.0.1',
+                        timestamp: '2022-08-18T15:42:32.597Z',
+                    },
+                    {
+                        event: 'test2',
+                        properties: {},
+                        distinct_id: 'did1',
+                        team_id: 1,
+                        uuid: '37114ebb-7b13-4301-b859-0d0bd4d5c7e5',
+                        ip: '127.0.0.1',
+                        timestamp: '2022-08-18T15:42:32.597Z',
+                        elements: [{ attr_id: 'haha' }],
+                    },
+                ],
+                meta as any
+            )
+
+            await expect(promise).rejects.toEqual(new RetryError('Error inserting into BigQuery! Some BigQuery error'))
         })
     })
 })
