@@ -193,35 +193,36 @@ describe('BigQuery Export Plugin', () => {
                 }
             )
         }),
-            test('ignores events in exportEventsToIgnore', async () => {
-                const meta = {
-                    config: {
-                        exportElementsOnAnyEvent: 'No',
-                    },
-                    global: {
-                        bigQueryTable: {
-                            insert: jest.fn(),
-                        },
-                        exportEventsToIgnore: new Set(['ignore me']),
-                    },
-                }
-                await exportEvents?.(
-                    [
-                        {
-                            event: 'ignore me',
-                            properties: {},
-                            distinct_id: 'did1',
-                            team_id: 1,
-                            uuid: '37114ebb-7b13-4301-b849-0d0bd4d5c7e5',
-                            ip: '127.0.0.1',
-                            timestamp: '2022-08-18T15:42:32.597Z',
-                        },
-                    ],
-                    meta as any
-                )
 
-                expect(meta.global.bigQueryTable.insert).not.toHaveBeenCalled()
-            })
+        test('ignores events in exportEventsToIgnore', async () => {
+            const meta = {
+                config: {
+                    exportElementsOnAnyEvent: 'No',
+                },
+                global: {
+                    bigQueryTable: {
+                        insert: jest.fn(),
+                    },
+                    exportEventsToIgnore: new Set(['ignore me']),
+                },
+            }
+            await exportEvents?.(
+                [
+                    {
+                        event: 'ignore me',
+                        properties: {},
+                        distinct_id: 'did1',
+                        team_id: 1,
+                        uuid: '37114ebb-7b13-4301-b849-0d0bd4d5c7e5',
+                        ip: '127.0.0.1',
+                        timestamp: '2022-08-18T15:42:32.597Z',
+                    },
+                ],
+                meta as any
+            )
+
+            expect(meta.global.bigQueryTable.insert).not.toHaveBeenCalled()
+        })
 
         test('exports elements if exportElementsOnAnyEvent is true', async () => {
             const customMeta = { ...meta, config: { exportElementsOnAnyEvent: 'Yes' } }
