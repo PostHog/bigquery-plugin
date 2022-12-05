@@ -30,7 +30,7 @@
             "key": "exportEventsToIgnore",
             "name": "Events to ignore",
             "type": "string",
-            "default": "$feature_flag_called",
+            "default": "$feature_flag_called,$autocapture",
             "hint": "Comma separated list of events to ignore"
         },
         {
