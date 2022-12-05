@@ -167,7 +167,7 @@ async function createBigQueryTable(meta: any) {
     try {
         await global.bigQueryClient
             .dataset(config.datasetId)
-            .createTable(config.tableId, { schema: BIG_QUERY_TABLE_FIELDS })
+            .createTable(config.tableId, { schema: BIG_QUERY_TABLE_FIELDS, timePartitioning: { type: 'DAY', field: 'timestamp' }})
 
         await meta.cache.set('cachedMetadata', {
             tableId: config.tableId,
