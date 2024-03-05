@@ -1,5 +1,8 @@
 # Google BigQuery Plugin
 
+> **Warning**
+> This plugin has been deprecated in favor of our [BigQuery destination for batch exports](https://posthog.com/docs/cdp/batch-exports/bigquery).
+
 Send events to a BigQuery database on ingestion.
 
 ## Installation
